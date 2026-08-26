@@ -190,7 +190,7 @@ local TabConfig = {
         Icon = "puzzle"
     }),
     Settings = WindowObject:CreateTab({
-        Title = "系统",
+        Title = "设置",
         Icon = "settings"
     })
 }
@@ -2277,6 +2277,33 @@ TabConfig.Settings:CreateButton({
         })
     end
 })
+
+-- ===== 新增：自定义快捷键打开/关闭 UI =====
+TabConfig.Settings:AddSection("界面设置")
+
+local UIOpenKey = "RightShift"  -- 默认键名
+
+TabConfig.Settings:CreateInput("UIOpenKeyInput", {
+    Title = "打开UI快捷键",
+    Description = "输入 Enum.KeyCode 的键名，例如 RightShift、F1 等",
+    Default = "RightShift",
+    Numeric = false
+}):OnChanged(function(value)
+    UIOpenKey = value
+end)
+
+-- 监听键盘事件
+InputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end  -- 忽略聊天输入等情况
+    local keyCode = Enum.KeyCode[UIOpenKey]
+    if keyCode and input.KeyCode == keyCode then
+        if WindowObject then
+            WindowObject.Visible = not WindowObject.Visible
+        end
+    end
+end)
+-- ==========================================
+
 LibraryScript:SetLibrary(LibraryLoader)
 LibraryScript1:SetLibrary(LibraryLoader)
 LibraryScript:IgnoreThemeSettings()

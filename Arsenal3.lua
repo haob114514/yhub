@@ -2,16 +2,13 @@ local repo = "https://raw.githubusercontent.com/ATLASTEAM01/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 
-
 local Options = Library.Options
 local Toggles = Library.Toggles
 
 local Window = Library:CreateWindow({ Title = "Y Hub | BY:y", Footer = "电脑按右shift打开ui", Center = true, AutoShow = true })
 
 -- ========================= UI快捷键设置 =========================
--- 默认右Shift打开/关闭UI，可在UI设置中修改
 local UIKeybind
-
 if Library.SetToggleKey then
     Library:SetToggleKey(Enum.KeyCode.RightShift)
 else
@@ -28,13 +25,12 @@ else
     end)
 end
 
-
 local Tabs = {
     Main = Window:AddTab("战斗", "crosshair"),
     Move = Window:AddTab("移动", "bolt"),
     Visual = Window:AddTab("视觉", "eye"),
     Misc = Window:AddTab("其他", "settings"),
-    UI = Window:AddTab("UI设置", "cog"),   -- 仅用于主题切换
+    UI = Window:AddTab("UI设置", "cog"),
 }
 
 local PlayerService = game:GetService("Players")
@@ -48,8 +44,7 @@ local Workspace = game:GetService("Workspace")
 local CurrentCamera = workspace.CurrentCamera
 local LocalPlayer = PlayerService.LocalPlayer
 
--- ========================= 飞行模块（原999） =========================
--- 优化：心跳循环只在飞行时连接，不飞行时零开销
+-- ========================= 飞行模块（优化） =========================
 local FlightSettings = { fly = false, flyspeed = 50 }
 local CharacterModel, Humanoid, BodyVelocity, BodyAngularVelocity, IsFlying = nil, nil, nil, nil, false
 local MovementKeys = { W = false, S = false, A = false, D = false, Space = false, LeftShift = false, Moving = false }
@@ -105,18 +100,41 @@ local function FlyFunction()
     end
 end
 
+-- 修复：彻底停止飞行并清理所有残留
 local function StopFlyingFunction()
     if BodyVelocity then BodyVelocity:Destroy() BodyVelocity = nil end
     if BodyAngularVelocity then BodyAngularVelocity:Destroy() BodyAngularVelocity = nil end
-    if IsFlying and Humanoid then
-        pcall(function() Humanoid.PlatformStand = false end)
+
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            pcall(function() hum.PlatformStand = false end)
+        end
+        -- 清除残留的速度组件
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") then
+                part:Destroy()
+            end
+        end
     end
+
     IsFlying = false
     if FlightConnection then
         FlightConnection:Disconnect()
         FlightConnection = nil
     end
 end
+
+-- 角色重生时重置飞行状态
+LocalPlayer.CharacterAdded:Connect(function()
+    if IsFlying then StopFlyingFunction() end
+    IsFlying = false
+    if FlightConnection then
+        FlightConnection:Disconnect()
+        FlightConnection = nil
+    end
+end)
 
 InputService.InputBegan:Connect(function(key, gp)
     if not gp then
@@ -143,7 +161,7 @@ InputService.InputEnded:Connect(function(key, gp)
     end
 end)
 
--- ========================= Hitbox、Triggerbot、Autofarm、Weapon Mods（原999） =========================
+-- ========================= Hitbox、Triggerbot、Autofarm、Weapon Mods =========================
 local BooleanFlag = false
 local ConfigTable = {}
 local IntegerValue = 21
@@ -232,7 +250,6 @@ local function UpdateHitboxes()
     end
 end
 
--- 优化：Hitbox 每 0.1 秒更新一次（约10Hz），不再每帧全量扫描，肉眼无差别
 local HitboxTickTimer = 0
 local function HitboxTick(dt)
     HitboxTickTimer = HitboxTickTimer + dt
@@ -246,7 +263,7 @@ PlayerService.PlayerRemoving:Connect(function(plr)
     ConfigTable[plr] = nil
 end)
 
--- ======= 锁头（原999）保留，与自瞄并存 =======
+-- ======= 锁头 =======
 local Flag1 = false
 local LockOnTarget = "Enemies"
 local EnemyCharacter = nil
@@ -318,7 +335,6 @@ local function UpdateLock()
 end
 
 -- ======= Triggerbot =======
--- 优化：RenderStepped 只在开关开启时连接，关闭后零帧开销
 getgenv().triggerb = false
 local GameType = "Team-Based"
 local BoolHealth = true
@@ -492,7 +508,7 @@ local NoClipEnabled = false
 local CollectDebris = false
 local DebrisFilter = "Both"
 
--- ======= 物品ESP（原999） =======
+-- ======= 物品ESP =======
 local ESPData = {}
 local function CreateESP(instance, text)
     local bill = Instance.new("BillboardGui")
@@ -511,7 +527,6 @@ local function CreateESP(instance, text)
     return bill
 end
 
--- 优化：DescendantAdded 只连接一次，用启用集合判断，避免重复连接累积
 local ESPEnabledNames = {}
 local ESPConn = nil
 
@@ -572,7 +587,7 @@ local TerrainBackup = {
 local MaterialBackup = {}
 local EffectBackup = {}
 
--- ======= 皮肤（原999） =======
+-- ======= 皮肤 =======
 local ArmMaterial = "Plastic"
 local ArmColor = Color3.fromRGB(50,50,50)
 local ArmSkinEnabled = false
@@ -588,7 +603,7 @@ function zigzag(x) return math.acos(math.cos(x*math.pi))/math.pi end
 local NameSpoofEnabled = false
 local NameBackup = {}
 
--- ========================= 新增：FOV 吸附自瞄（来自666） =========================
+-- ========================= FOV 吸附自瞄 =========================
 local AimState = {
     enabled = false,
     wallAim = false,
@@ -597,7 +612,7 @@ local AimState = {
     enemyOnly = false,
     fovRadius = 150,
     maxDistance = 300,
-    smooth = 0.18,          -- 0.03~0.75
+    smooth = 0.18,
     aimPart = "Head",
     selected = nil,
     teamCheck = true,
@@ -607,11 +622,8 @@ local AimState = {
 local AimCurrentTarget = nil
 local AimFovCircle = nil
 local AimConnection = nil
-
--- 优化：可见性射线检测缓存（每玩家0.1秒），减少自瞄开启时每帧射线数
 local AimVisCache = {}
 
--- 工具函数
 local function Aim_char(plr) return plr and plr.Character end
 local function Aim_hum(plr)
     local c = Aim_char(plr)
@@ -817,7 +829,7 @@ local function Aim_setEnabled(enabled)
     Aim_updateFovCircle()
 end
 
--- ========================= 新增：玩家绘制模块（来自666） =========================
+-- ========================= 玩家绘制模块 =========================
 do
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
@@ -1231,9 +1243,9 @@ do
     }
 end
 
--- ========================= UI 构建（使用 Library） =========================
+-- ========================= UI 构建 =========================
 local MainGroup = Tabs.Main:AddLeftGroupbox("战斗基础")
--- Hitbox
+
 MainGroup:AddToggle("HitboxToggle", { Text = "开启 Hitbox 扩大", Default = BooleanFlag }):AddKeyPicker("HitboxKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.HitboxToggle:OnChanged(function(state)
     task.spawn(function()
@@ -1268,7 +1280,6 @@ Options.GameMode:OnChanged(function(v)
     task.spawn(function() GameMode = v end)
 end)
 
--- 锁头（原999）
 MainGroup:AddToggle("LockToggle", { Text = "开启强锁头（旧）", Default = Flag1 }):AddKeyPicker("LockKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.LockToggle:OnChanged(function(state)
     task.spawn(function()
@@ -1287,7 +1298,7 @@ Options.LockTarget:OnChanged(function(v)
     task.spawn(function() LockOnTarget = v; EnemyCharacter = nil end)
 end)
 
--- ===== FOV 自瞄（新增） =====
+-- ===== FOV 自瞄 =====
 local AimGroup = Tabs.Main:AddRightGroupbox("FOV 吸附自瞄")
 AimGroup:AddToggle("AimEnable", { Text = "开启 FOV 吸附", Default = AimState.enabled })
 Toggles.AimEnable:OnChanged(function(state)
@@ -1385,15 +1396,21 @@ MainGroup:AddToggle("FarmToggle", { Text = "开启 Ragebot / 自动刷 (高风�
 Toggles.FarmToggle:OnChanged(function(state)
     task.spawn(function()
         getgenv().AutoFarm = state
-        ReplicatedStorage.wkspc.CurrentCurse.Value = state and "Infinite Ammo" or ""
         if state then
             task.wait(0.5)
             if LocalPlayer.Character then StartFarm() end
         else
+            -- 彻底停止
+            if farmConnection then
+                farmConnection:Disconnect()
+                farmConnection = nil
+            end
+            if farmPressed then
+                mouse1release()
+                farmPressed = false
+            end
             ReplicatedStorage.wkspc.CurrentCurse.Value = ""
             ReplicatedStorage.wkspc.TimeScale.Value = 1
-            if farmConnection then farmConnection:Disconnect() farmConnection = nil end
-            if farmPressed then mouse1release() farmPressed = false end
         end
     end)
 end)
@@ -1407,7 +1424,6 @@ Toggles.InfAmmo1:OnChanged(function(state)
     end)
 end)
 
--- 优化：无限弹药2 改为单一 Stepped 连接，修复反复开关导致连接堆积的卡顿
 local InfAmmoConnection = nil
 local function InfAmmoStep()
     if not infAmmoV2 then return end
@@ -1530,7 +1546,11 @@ local MoveGroup = Tabs.Move:AddLeftGroupbox("移动控制")
 MoveGroup:AddToggle("FlyToggle", { Text = "飞行", Default = false }):AddKeyPicker("FlyKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.FlyToggle:OnChanged(function(state)
     task.spawn(function()
-        if state then FlyFunction() else StopFlyingFunction() end
+        if state then
+            FlyFunction()
+        else
+            StopFlyingFunction()
+        end
     end)
 end)
 
@@ -1539,22 +1559,23 @@ Options.FlySpeed:OnChanged(function(v)
     task.spawn(function() FlightSettings.flyspeed = v end)
 end)
 
--- 优化：速度 Stepped 仅在开启时连接
+-- 优化速度：仅在移动时生效
 local SpeedConnection = nil
 local function SpeedStep(dt)
     if not SpeedEnabled then return end
-    if LocalPlayer and LocalPlayer.Character then
-        local char = LocalPlayer.Character
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum and root then
-            if SpeedMethod == "Velocity" then
-                root.Velocity = Vector3.new(hum.MoveDirection.X * WalkSpeedConfig.WalkSpeed, root.Velocity.Y, hum.MoveDirection.Z * WalkSpeedConfig.WalkSpeed)
-            elseif SpeedMethod == "Vector" then
-                root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt * 0.0001
-            elseif SpeedMethod == "CFrame" then
-                root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt * 0.0001
-            end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum and root and hum.MoveDirection.Magnitude > 0.1 then
+        if SpeedMethod == "Velocity" then
+            root.Velocity = Vector3.new(
+                hum.MoveDirection.X * WalkSpeedConfig.WalkSpeed,
+                root.Velocity.Y,
+                hum.MoveDirection.Z * WalkSpeedConfig.WalkSpeed
+            )
+        elseif SpeedMethod == "CFrame" then
+            root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt
         end
     end
 end
@@ -1576,7 +1597,7 @@ Toggles.SpeedToggle:OnChanged(function(state)
     end)
 end)
 
-MoveGroup:AddDropdown("SpeedMethod", { Text = "速度方式", Values = {"Velocity","Vector","CFrame"}, Default = SpeedMethod })
+MoveGroup:AddDropdown("SpeedMethod", { Text = "速度方式", Values = {"Velocity","CFrame"}, Default = SpeedMethod })
 Options.SpeedMethod:OnChanged(function(v)
     task.spawn(function() SpeedMethod = v end)
 end)
@@ -1639,7 +1660,7 @@ Options.SpinSpeed:OnChanged(function(v)
     end)
 end)
 
--- 优化：穿墙改为“事件驱动 + 低频重断言”，不再每帧遍历全身零件
+-- 穿墙
 local NoClipHeartbeat = nil
 local noClipTimer = 0
 local noClipCharConn = nil
@@ -1711,7 +1732,6 @@ Toggles.NoClipToggle:OnChanged(function(state)
     end)
 end)
 
--- 优化：物品传送频率 0.1s -> 0.3s，10Hz 降为约 3Hz，肉眼无差别
 MoveGroup:AddToggle("CollectDebrisToggle", { Text = "物品传送", Default = CollectDebris })
 Toggles.CollectDebrisToggle:OnChanged(function(state)
     task.spawn(function()
@@ -1749,7 +1769,6 @@ end)
 -- ========================= 视觉 Tab =========================
 local VisualGroup = Tabs.Visual:AddLeftGroupbox("视觉")
 
--- 物品ESP
 VisualGroup:AddToggle("AmmoESP", { Text = "弹药 ESP", Default = false })
 Toggles.AmmoESP:OnChanged(function(state)
     task.spawn(function() ToggleESP(state, "DeadAmmo", "弹药箱") end)
@@ -1760,7 +1779,6 @@ Toggles.HealthESP:OnChanged(function(state)
     task.spawn(function() ToggleESP(state, "DeadHP", "补血箱") end)
 end)
 
--- 全局视觉
 VisualGroup:AddToggle("FullBright", { Text = "全局光亮", Default = false })
 Toggles.FullBright:OnChanged(function(state)
     task.spawn(function()
@@ -1786,7 +1804,6 @@ Toggles.NoShadows:OnChanged(function(state)
     task.spawn(function() LightingService.GlobalShadows = not state end)
 end)
 
--- 优化：X射线遍历时每500个实例让出线程，避免一次性扫描卡顿
 VisualGroup:AddToggle("XRay", { Text = "X射线透视", Default = false })
 Toggles.XRay:OnChanged(function(state)
     task.spawn(function()
@@ -1909,7 +1926,7 @@ Toggles.FPSBoost:OnChanged(function(state)
     end)
 end)
 
--- ===== 玩家绘制（新增） =====
+-- ===== 玩家绘制 =====
 local PlayerEspGroup = Tabs.Visual:AddRightGroupbox("玩家绘制")
 PlayerEspGroup:AddToggle("DrawEnemyEsp", { Text = "启用敌人ESP (高亮)", Default = false })
 Toggles.DrawEnemyEsp:OnChanged(function(state)
@@ -1949,7 +1966,6 @@ Options.ArmColor:OnChanged(function(text)
     if r and g and b then ArmColor = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b)) end
 end)
 
--- 优化：皮肤循环频率 0.01s -> 0.1s（10Hz），效果不变但负载降10倍
 SkinGroup:AddToggle("ArmSkinToggle", { Text = "启用手臂皮肤", Default = ArmSkinEnabled })
 Toggles.ArmSkinToggle:OnChanged(function(state)
     task.spawn(function()
@@ -2016,7 +2032,6 @@ Toggles.GunSkinToggle:OnChanged(function(state)
     end)
 end)
 
--- 优化：彩虹效果 RenderStepped 仅在开启时连接
 local RainbowConnection = nil
 local function RainbowStep()
     if not (RainbowWave or RainbowPulse) then return end
@@ -2144,21 +2159,54 @@ Options.TimeScale:OnChanged(function(text)
     end)
 end)
 
--- ========================= UI Tab（仅主题，无配置管理） =========================
--- 修复：添加 ThemeManager:SetLibrary(Library) 以使主题控件显示
+-- ===== 新增：重置角色控制按钮 =====
+MiscGroup:AddButton("重置角色控制", function()
+    task.spawn(function()
+        -- 停止所有可能限制移动的功能
+        StopFlyingFunction()
+        if farmConnection then
+            farmConnection:Disconnect()
+            farmConnection = nil
+        end
+        if farmPressed then
+            mouse1release()
+            farmPressed = false
+        end
+        if SpeedConnection then
+            SpeedConnection:Disconnect()
+            SpeedConnection = nil
+        end
+        -- 重置角色状态
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+            end
+            -- 删除任何残留的物理约束
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") or part:IsA("BodyGyro") then
+                    part:Destroy()
+                end
+            end
+        end
+        Library:Notify("重置", "角色控制已恢复", 2)
+    end)
+end)
+
+-- ========================= UI Tab（主题） =========================
 ThemeManager:SetLibrary(Library)
 ThemeManager:ApplyToTab(Tabs.UI)
-
--- 为了美观，添加一个标签说明
 local uiGroup = Tabs.UI:AddLeftGroupbox("主题设置")
 uiGroup:AddLabel("使用下方按钮切换主题")
 
 Library:Notify("兵工厂", "功能已加载，请查看各标签页", 4)
 
--- ========================= 新增：悬浮窗（手机/电脑通用） =========================
+-- ========================= 悬浮窗 =========================
 task.spawn(function()
-    task.wait(0.8)  -- 确保主窗口完全初始化
-
+    task.wait(0.8)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "FloatingMenu"
     screenGui.ResetOnSpawn = false
@@ -2166,7 +2214,7 @@ task.spawn(function()
 
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 60, 0, 60)
-    frame.Position = UDim2.new(0, 16, 0, 120)  -- 初始左上角
+    frame.Position = UDim2.new(0, 16, 0, 120)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     frame.BackgroundTransparency = 0.25
     frame.BorderSizePixel = 0
@@ -2232,9 +2280,9 @@ task.spawn(function()
     end)
 end)
 
--- ========================= 电脑端快捷键：右Shift 切换主窗口 =========================
+-- ========================= 电脑端快捷键：右Shift =========================
 InputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end  -- 忽略游戏内输入框等
+    if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
         if Window then
             if Window.Toggle then

@@ -5,7 +5,7 @@ local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))
 local Options = Library.Options
 local Toggles = Library.Toggles
 
-local Window = Library:CreateWindow({ Title = "Y Hub | BY:y", Footer = "电脑按右shift打开ui", Center = true, AutoShow = true })
+local Window = Library:CreateWindow({ Title = "YEX—Hub | 兵工厂 BY:y", Footer = "电脑端按右shift打开ui", Center = true, AutoShow = true })
 
 -- ========================= UI快捷键设置 =========================
 local UIKeybind
@@ -603,7 +603,7 @@ function zigzag(x) return math.acos(math.cos(x*math.pi))/math.pi end
 local NameSpoofEnabled = false
 local NameBackup = {}
 
--- ========================= FOV 吸附自瞄 =========================
+-- ========================= 吸附 吸附自瞄 =========================
 local AimState = {
     enabled = false,
     wallAim = false,
@@ -1299,28 +1299,28 @@ Options.LockTarget:OnChanged(function(v)
 end)
 
 -- ===== FOV 自瞄 =====
-local AimGroup = Tabs.Main:AddRightGroupbox("FOV 吸附自瞄")
-AimGroup:AddToggle("AimEnable", { Text = "开启 FOV 吸附", Default = AimState.enabled })
+local AimGroup = Tabs.Main:AddRightGroupbox("FOV自瞄")
+AimGroup:AddToggle("AimEnable", { Text = "开启 FOV 自瞄", Default = AimState.enabled })
 Toggles.AimEnable:OnChanged(function(state)
     task.spawn(function() Aim_setEnabled(state) end)
 end)
 
-AimGroup:AddToggle("AimWall", { Text = "穿透也允许吸附", Default = AimState.wallAim })
+AimGroup:AddToggle("AimWall", { Text = "有墙壁也允许自瞄", Default = AimState.wallAim })
 Toggles.AimWall:OnChanged(function(state)
     task.spawn(function() AimState.wallAim = state end)
 end)
 
-AimGroup:AddToggle("AimDead", { Text = "死亡目标也允许吸附", Default = AimState.aimDead })
+AimGroup:AddToggle("AimDead", { Text = "死亡目标也允许自瞄", Default = AimState.aimDead })
 Toggles.AimDead:OnChanged(function(state)
     task.spawn(function() AimState.aimDead = state end)
 end)
 
-AimGroup:AddToggle("AimOnlySelected", { Text = "只吸附所选玩家", Default = AimState.onlySelected })
+AimGroup:AddToggle("AimOnlySelected", { Text = "只自瞄所选玩家", Default = AimState.onlySelected })
 Toggles.AimOnlySelected:OnChanged(function(state)
     task.spawn(function() AimState.onlySelected = state end)
 end)
 
-AimGroup:AddToggle("AimEnemyOnly", { Text = "只锁敌人", Default = AimState.enemyOnly })
+AimGroup:AddToggle("AimEnemyOnly", { Text = "只瞄敌人", Default = AimState.enemyOnly })
 Toggles.AimEnemyOnly:OnChanged(function(state)
     task.spawn(function() AimState.enemyOnly = state end)
 end)
@@ -1333,7 +1333,7 @@ Options.AimFovRadius:OnChanged(function(v)
     end)
 end)
 
-AimGroup:AddSlider("AimMaxDist", { Text = "最大吸附距离", Min = 20, Max = 2000, Default = AimState.maxDistance, Rounding = 1 })
+AimGroup:AddSlider("AimMaxDist", { Text = "最大自瞄距离", Min = 20, Max = 2000, Default = AimState.maxDistance, Rounding = 1 })
 Options.AimMaxDist:OnChanged(function(v)
     task.spawn(function() AimState.maxDistance = v end)
 end)
@@ -1343,12 +1343,12 @@ Options.AimSmooth:OnChanged(function(v)
     task.spawn(function() AimState.smooth = math.clamp(v / 100, 0.03, 0.75) end)
 end)
 
-AimGroup:AddDropdown("AimPart", { Text = "吸附部位", Values = {"Head","UpperTorso","HumanoidRootPart","LowerTorso","Torso"}, Default = AimState.aimPart })
+AimGroup:AddDropdown("AimPart", { Text = "自瞄部位", Values = {"Head","UpperTorso","HumanoidRootPart","LowerTorso","Torso"}, Default = AimState.aimPart })
 Options.AimPart:OnChanged(function(v)
     task.spawn(function() AimState.aimPart = v end)
 end)
 
-AimGroup:AddInput("AimPlayerName", { Text = "输入玩家名（模糊匹配）", Placeholder = "输入名称...", Default = "" })
+AimGroup:AddInput("AimPlayerName", { Text = "输入玩家名（针对玩家）", Placeholder = "输入名称...", Default = "" })
 Options.AimPlayerName:OnChanged(function(text)
     _G._AimInputText = text
 end)
@@ -1373,7 +1373,7 @@ AimGroup:AddButton("取消选择", function()
     end)
 end)
 
-AimGroup:AddToggle("AimShowFov", { Text = "显示 FOV 圆圈（调试）", Default = AimState.showFov })
+AimGroup:AddToggle("AimShowFov", { Text = "显示 FOV 圆圈", Default = AimState.showFov })
 Toggles.AimShowFov:OnChanged(function(state)
     task.spawn(function()
         AimState.showFov = state
@@ -1387,12 +1387,12 @@ Toggles.TriggerToggle:OnChanged(function(state)
     task.spawn(function() SetTriggerEnabled(state) end)
 end)
 
-MainGroup:AddDropdown("TriggerMode", { Text = "Triggerbot 队伍", Values = {"混战模式","团队模式","所有模式"}, Default = GameType })
+MainGroup:AddDropdown("TriggerMode", { Text = "自动开枪模式检查", Values = {"混战模式","团队模式","所有模式"}, Default = GameType })
 Options.TriggerMode:OnChanged(function(v)
     task.spawn(function() GameType = v end)
 end)
 
-MainGroup:AddToggle("FarmToggle", { Text = "开启 Ragebot / 自动刷 (高风险)", Default = getgenv().AutoFarm }):AddKeyPicker("FarmKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
+MainGroup:AddToggle("FarmToggle", { Text = "开启自动传送击杀 (高风险)", Default = getgenv().AutoFarm }):AddKeyPicker("FarmKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.FarmToggle:OnChanged(function(state)
     task.spawn(function()
         getgenv().AutoFarm = state
@@ -1622,7 +1622,7 @@ Toggles.InfJumpToggle:OnChanged(function(state)
     end)
 end)
 
-MoveGroup:AddToggle("AntiAimToggle", { Text = "反自瞄", Default = AntiAimEnabled })
+MoveGroup:AddToggle("AntiAimToggle", { Text = "角色旋转", Default = AntiAimEnabled })
 Toggles.AntiAimToggle:OnChanged(function(state)
     task.spawn(function()
         AntiAimEnabled = state
@@ -1804,7 +1804,7 @@ Toggles.NoShadows:OnChanged(function(state)
     task.spawn(function() LightingService.GlobalShadows = not state end)
 end)
 
-VisualGroup:AddToggle("XRay", { Text = "X射线透视", Default = false })
+VisualGroup:AddToggle("XRay", { Text = "地图透明", Default = false })
 Toggles.XRay:OnChanged(function(state)
     task.spawn(function()
         local n = 0
@@ -1831,7 +1831,7 @@ Toggles.XRay:OnChanged(function(state)
     end)
 end)
 
-VisualGroup:AddToggle("LowLatency", { Text = "低延迟", Default = false })
+VisualGroup:AddToggle("LowLatency", { Text = "降低延迟", Default = false })
 Toggles.LowLatency:OnChanged(function(state)
     task.spawn(function()
         if state then
@@ -2071,7 +2071,7 @@ Toggles.RainbowPulse:OnChanged(function(state)
 end)
 
 -- ========================= 其他 Tab =========================
-local MiscGroup = Tabs.Misc:AddLeftGroupbox("杂项工具")
+local MiscGroup = Tabs.Misc:AddLeftGroupbox("美化工具")
 MiscGroup:AddToggle("FakeStats", { Text = "伪造等级（客户端）", Default = false })
 Toggles.FakeStats:OnChanged(function(state)
     task.spawn(function()
@@ -2202,83 +2202,7 @@ ThemeManager:ApplyToTab(Tabs.UI)
 local uiGroup = Tabs.UI:AddLeftGroupbox("主题设置")
 uiGroup:AddLabel("使用下方按钮切换主题")
 
-Library:Notify("兵工厂", "功能已加载，请查看各标签页", 4)
-
--- ========================= 悬浮窗 =========================
-task.spawn(function()
-    task.wait(0.8)
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "FloatingMenu"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 60, 0, 60)
-    frame.Position = UDim2.new(0, 16, 0, 120)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    frame.BackgroundTransparency = 0.25
-    frame.BorderSizePixel = 0
-    frame.Parent = screenGui
-    frame.Draggable = true
-    frame.Active = true
-    frame.Selectable = true
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = frame
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Transparency = 0.35
-    stroke.Thickness = 1
-    stroke.Parent = frame
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = "⚙"
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 30
-    label.TextScaled = true
-    label.Parent = frame
-
-    local function toggleMainWindow()
-        if Window then
-            if Window.Toggle then
-                Window:Toggle()
-            elseif Window.SetVisible then
-                Window:SetVisible(not Window.Visible)
-            end
-        end
-    end
-
-    local isDragging = false
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or
-           input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
-            local startPos = input.Position
-            frame.InputChanged:Connect(function(changed)
-                if changed.UserInputType == input.UserInputType then
-                    if (changed.Position - startPos).Magnitude > 10 then
-                        isDragging = true
-                    end
-                end
-            end)
-        end
-    end)
-
-    frame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or
-           input.UserInputType == Enum.UserInputType.Touch then
-            task.wait(0.05)
-            if not isDragging then
-                toggleMainWindow()
-            end
-        end
-    end)
-end)
+Library:Notify("Arsenal", "功能已加载，请查看各标签页", 4)
 
 -- ========================= 电脑端快捷键：右Shift =========================
 InputService.InputBegan:Connect(function(input, gameProcessed)

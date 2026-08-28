@@ -44,7 +44,7 @@ local Workspace = game:GetService("Workspace")
 local CurrentCamera = workspace.CurrentCamera
 local LocalPlayer = PlayerService.LocalPlayer
 
--- ========================= 飞行模块（完全修复） =========================
+-- ========================= 飞行模块（优化） =========================
 local FlightSettings = { fly = false, flyspeed = 50 }
 local CharacterModel, Humanoid, BodyVelocity, BodyAngularVelocity, IsFlying = nil, nil, nil, nil, false
 local MovementKeys = { W = false, S = false, A = false, D = false, Space = false, LeftShift = false, Moving = false }
@@ -100,35 +100,22 @@ local function FlyFunction()
     end
 end
 
--- 增强修复：彻底停止飞行并重置角色
+-- 修复：彻底停止飞行并清理所有残留
 local function StopFlyingFunction()
-    -- 1. 删除自身创建的速度组件
     if BodyVelocity then BodyVelocity:Destroy() BodyVelocity = nil end
     if BodyAngularVelocity then BodyAngularVelocity:Destroy() BodyAngularVelocity = nil end
 
-    -- 2. 处理当前角色
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
-            pcall(function()
-                hum.PlatformStand = false
-                hum.WalkSpeed = 16          -- 恢复默认走路速度
-                hum.JumpPower = 50          -- 恢复默认跳跃力度
-                hum.AutoRotate = true       -- 允许自动转向
-            end)
+            pcall(function() hum.PlatformStand = false end)
         end
-        -- 删除所有残留的 Body 约束（包括其他脚本可能创建的）
+        -- 清除残留的速度组件
         for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") or part:IsA("BodyGyro") then
-                pcall(function() part:Destroy() end)
+            if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") then
+                part:Destroy()
             end
-        end
-        -- 额外清理：重置根部位的速度
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.Velocity = Vector3.new(0,0,0)
-            root.RotVelocity = Vector3.new(0,0,0)
         end
     end
 
@@ -137,32 +124,6 @@ local function StopFlyingFunction()
         FlightConnection:Disconnect()
         FlightConnection = nil
     end
-
-    -- 3. 延迟再重置一次，确保所有物理更新完成
-    task.spawn(function()
-        task.wait(0.1)
-        local char2 = LocalPlayer.Character
-        if char2 then
-            local hum2 = char2:FindFirstChildOfClass("Humanoid")
-            if hum2 then
-                pcall(function()
-                    hum2.PlatformStand = false
-                    hum2.WalkSpeed = 16
-                    hum2.JumpPower = 50
-                end)
-            end
-            for _, part in pairs(char2:GetDescendants()) do
-                if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") or part:IsA("BodyGyro") then
-                    pcall(function() part:Destroy() end)
-                end
-            end
-            local root2 = char2:FindFirstChild("HumanoidRootPart")
-            if root2 then
-                root2.Velocity = Vector3.new(0,0,0)
-                root2.RotVelocity = Vector3.new(0,0,0)
-            end
-        end
-    end)
 end
 
 -- 角色重生时重置飞行状态
@@ -1439,6 +1400,7 @@ Toggles.FarmToggle:OnChanged(function(state)
             task.wait(0.5)
             if LocalPlayer.Character then StartFarm() end
         else
+            -- 彻底停止
             if farmConnection then
                 farmConnection:Disconnect()
                 farmConnection = nil
@@ -2197,9 +2159,10 @@ Options.TimeScale:OnChanged(function(text)
     end)
 end)
 
--- ===== 重置角色控制按钮 =====
+-- ===== 新增：重置角色控制按钮 =====
 MiscGroup:AddButton("重置角色控制", function()
     task.spawn(function()
+        -- 停止所有可能限制移动的功能
         StopFlyingFunction()
         if farmConnection then
             farmConnection:Disconnect()
@@ -2213,6 +2176,7 @@ MiscGroup:AddButton("重置角色控制", function()
             SpeedConnection:Disconnect()
             SpeedConnection = nil
         end
+        -- 重置角色状态
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -2221,15 +2185,11 @@ MiscGroup:AddButton("重置角色控制", function()
                 hum.WalkSpeed = 16
                 hum.JumpPower = 50
             end
+            -- 删除任何残留的物理约束
             for _, part in pairs(char:GetDescendants()) do
                 if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") or part:IsA("BodyGyro") then
                     part:Destroy()
                 end
-            end
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                root.Velocity = Vector3.new(0,0,0)
-                root.RotVelocity = Vector3.new(0,0,0)
             end
         end
         Library:Notify("重置", "角色控制已恢复", 2)

@@ -2,13 +2,16 @@ local repo = "https://raw.githubusercontent.com/ATLASTEAM01/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 
+
 local Options = Library.Options
 local Toggles = Library.Toggles
 
 local Window = Library:CreateWindow({ Title = "Y Hub | BY:y", Footer = "电脑按右shift打开ui", Center = true, AutoShow = true })
 
 -- ========================= UI快捷键设置 =========================
+-- 默认右Shift打开/关闭UI，可在UI设置中修改
 local UIKeybind
+
 if Library.SetToggleKey then
     Library:SetToggleKey(Enum.KeyCode.RightShift)
 else
@@ -25,12 +28,13 @@ else
     end)
 end
 
+
 local Tabs = {
     Main = Window:AddTab("战斗", "crosshair"),
     Move = Window:AddTab("移动", "bolt"),
     Visual = Window:AddTab("视觉", "eye"),
     Misc = Window:AddTab("其他", "settings"),
-    UI = Window:AddTab("UI设置", "cog"),
+    UI = Window:AddTab("UI设置", "cog"),   -- 仅用于主题切换
 }
 
 local PlayerService = game:GetService("Players")
@@ -44,11 +48,39 @@ local Workspace = game:GetService("Workspace")
 local CurrentCamera = workspace.CurrentCamera
 local LocalPlayer = PlayerService.LocalPlayer
 
--- ========================= 飞行模块（优化：动态连接） =========================
+-- ========================= 飞行模块（原999） =========================
+-- 优化：心跳循环只在飞行时连接，不飞行时零开销
 local FlightSettings = { fly = false, flyspeed = 50 }
 local CharacterModel, Humanoid, BodyVelocity, BodyAngularVelocity, IsFlying = nil, nil, nil, nil, false
 local MovementKeys = { W = false, S = false, A = false, D = false, Space = false, LeftShift = false, Moving = false }
-local flyConnection = nil
+local FlightConnection = nil
+
+local function LocalFunction(vel) return vel.Unit * FlightSettings.flyspeed end
+
+local function FlightHeartbeat(dt)
+    if not IsFlying then
+        if FlightConnection then
+            FlightConnection:Disconnect()
+            FlightConnection = nil
+        end
+        return
+    end
+    if not (CharacterModel and CharacterModel.PrimaryPart) then return end
+    local pos = CharacterModel.PrimaryPart.Position
+    local cf = CurrentCamera.CFrame
+    local x,y,z = cf:toEulerAnglesXYZ()
+    CharacterModel:SetPrimaryPartCFrame(CFrame.new(pos.x,pos.y,pos.z) * CFrame.Angles(x,y,z))
+    if MovementKeys.W or MovementKeys.S or MovementKeys.A or MovementKeys.D or MovementKeys.Space or MovementKeys.LeftShift then
+        local newVec = Vector3.new()
+        if MovementKeys.W then newVec = newVec + LocalFunction(cf.LookVector) end
+        if MovementKeys.S then newVec = newVec - LocalFunction(cf.LookVector) end
+        if MovementKeys.A then newVec = newVec - LocalFunction(cf.RightVector) end
+        if MovementKeys.D then newVec = newVec + LocalFunction(cf.RightVector) end
+        if MovementKeys.Space then newVec = newVec + Vector3.new(0, FlightSettings.flyspeed, 0) end
+        if MovementKeys.LeftShift then newVec = newVec - Vector3.new(0, FlightSettings.flyspeed, 0) end
+        CharacterModel:TranslateBy(newVec * dt)
+    end
+end
 
 local function FlyFunction()
     if LocalPlayer.Character and LocalPlayer.Character.Head and not IsFlying then
@@ -66,16 +98,23 @@ local function FlyFunction()
         BodyVelocity.Parent = CharacterModel.Head
         BodyAngularVelocity.Parent = CharacterModel.Head
         IsFlying = true
+        if not FlightConnection then
+            FlightConnection = RunService.Heartbeat:Connect(FlightHeartbeat)
+        end
         Humanoid.Died:Connect(function() IsFlying = false end)
     end
 end
 
 local function StopFlyingFunction()
-    if LocalPlayer.Character and IsFlying then
-        Humanoid.PlatformStand = false
-        if BodyVelocity then BodyVelocity:Destroy() end
-        if BodyAngularVelocity then BodyAngularVelocity:Destroy() end
-        IsFlying = false
+    if BodyVelocity then BodyVelocity:Destroy() BodyVelocity = nil end
+    if BodyAngularVelocity then BodyAngularVelocity:Destroy() BodyAngularVelocity = nil end
+    if IsFlying and Humanoid then
+        pcall(function() Humanoid.PlatformStand = false end)
+    end
+    IsFlying = false
+    if FlightConnection then
+        FlightConnection:Disconnect()
+        FlightConnection = nil
     end
 end
 
@@ -104,28 +143,7 @@ InputService.InputEnded:Connect(function(key, gp)
     end
 end)
 
-local function LocalFunction(vel) return vel.Unit * FlightSettings.flyspeed end
-
-local function flyLoop(dt)
-    if IsFlying and CharacterModel and CharacterModel.PrimaryPart then
-        local pos = CharacterModel.PrimaryPart.Position
-        local cf = CurrentCamera.CFrame
-        local x,y,z = cf:toEulerAnglesXYZ()
-        CharacterModel:SetPrimaryPartCFrame(CFrame.new(pos.x,pos.y,pos.z) * CFrame.Angles(x,y,z))
-        if MovementKeys.W or MovementKeys.S or MovementKeys.A or MovementKeys.D or MovementKeys.Space or MovementKeys.LeftShift then
-            local newVec = Vector3.new()
-            if MovementKeys.W then newVec = newVec + LocalFunction(cf.LookVector) end
-            if MovementKeys.S then newVec = newVec - LocalFunction(cf.LookVector) end
-            if MovementKeys.A then newVec = newVec - LocalFunction(cf.RightVector) end
-            if MovementKeys.D then newVec = newVec + LocalFunction(cf.RightVector) end
-            if MovementKeys.Space then newVec = newVec + Vector3.new(0, FlightSettings.flyspeed, 0) end
-            if MovementKeys.LeftShift then newVec = newVec - Vector3.new(0, FlightSettings.flyspeed, 0) end
-            CharacterModel:TranslateBy(newVec * dt)
-        end
-    end
-end
-
--- ========================= Hitbox、Triggerbot、Autofarm、Weapon Mods =========================
+-- ========================= Hitbox、Triggerbot、Autofarm、Weapon Mods（原999） =========================
 local BooleanFlag = false
 local ConfigTable = {}
 local IntegerValue = 21
@@ -133,7 +151,6 @@ local SmallIntegerValue = 6
 local GameMode = "Team-Based"
 local UnknownValue = nil
 local PartNames = {"UpperTorso","Head","HumanoidRootPart"}
-local hitboxConnection = nil
 
 local function SavePart(player, part)
     if not ConfigTable[player] then ConfigTable[player] = {} end
@@ -215,11 +232,21 @@ local function UpdateHitboxes()
     end
 end
 
+-- 优化：Hitbox 每 0.1 秒更新一次（约10Hz），不再每帧全量扫描，肉眼无差别
+local HitboxTickTimer = 0
+local function HitboxTick(dt)
+    HitboxTickTimer = HitboxTickTimer + dt
+    if HitboxTickTimer >= 0.1 then
+        HitboxTickTimer = 0
+        UpdateHitboxes()
+    end
+end
+
 PlayerService.PlayerRemoving:Connect(function(plr)
     ConfigTable[plr] = nil
 end)
 
--- ======= 锁头（旧）动态连接 =======
+-- ======= 锁头（原999）保留，与自瞄并存 =======
 local Flag1 = false
 local LockOnTarget = "Enemies"
 local EnemyCharacter = nil
@@ -227,7 +254,6 @@ local NullValue = nil
 local DistanceValue = 200
 local SmoothLock = false
 local TimeValue = 0.2
-local lockConnection = nil
 
 local function IsLockTarget(player)
     if player and player ~= LocalPlayer and player.Team and LocalPlayer.Team then
@@ -291,14 +317,15 @@ local function UpdateLock()
     end
 end
 
--- ======= Triggerbot 动态连接 =======
+-- ======= Triggerbot =======
+-- 优化：RenderStepped 只在开关开启时连接，关闭后零帧开销
 getgenv().triggerb = false
 local GameType = "Team-Based"
 local BoolHealth = true
 local Flag2 = false
 local RaycastParams3 = RaycastParams.new()
 RaycastParams3.FilterType = Enum.RaycastFilterType.Blacklist
-local triggerConnection = nil
+local TriggerConnection = nil
 
 local function IsTriggerTarget(player)
     if player and player.Team and LocalPlayer.Team then
@@ -326,36 +353,54 @@ end
 LocalPlayer.CharacterAdded:Connect(SetupHealthCheck)
 SetupHealthCheck()
 
-local function triggerLoop()
-    if getgenv().triggerb and BoolHealth then
-        local char = LocalPlayer.Character
-        if char then
-            RaycastParams3.FilterDescendantsInstances = {char}
-            local center = CurrentCamera.ViewportSize / 2
-            local ray = CurrentCamera:ViewportPointToRay(center.X, center.Y)
-            local hit = Workspace:Raycast(ray.Origin, ray.Direction * 5000, RaycastParams3)
-            local should = false
-            if hit and hit.Instance then
-                local model = hit.Instance:FindFirstAncestorOfClass("Model")
-                if model and model:FindFirstChild("Humanoid") then
-                    local plr = PlayerService:GetPlayerFromCharacter(model)
-                    should = plr and IsTriggerTarget(plr) and not model:FindFirstChild("ForceField")
-                end
+local function TriggerRenderStep()
+    if not (getgenv().triggerb and BoolHealth) then
+        if Flag2 then
+            Flag2 = false
+            mouse1release()
+        end
+        return
+    end
+    local char = LocalPlayer.Character
+    if char then
+        RaycastParams3.FilterDescendantsInstances = {char}
+        local center = CurrentCamera.ViewportSize / 2
+        local ray = CurrentCamera:ViewportPointToRay(center.X, center.Y)
+        local hit = Workspace:Raycast(ray.Origin, ray.Direction * 5000, RaycastParams3)
+        local should = false
+        if hit and hit.Instance then
+            local model = hit.Instance:FindFirstAncestorOfClass("Model")
+            if model and model:FindFirstChild("Humanoid") then
+                local plr = PlayerService:GetPlayerFromCharacter(model)
+                should = plr and IsTriggerTarget(plr) and not model:FindFirstChild("ForceField")
             end
-            if should then
-                if not Flag2 then
-                    Flag2 = true
-                    mouse1press()
-                end
-            elseif Flag2 then
-                Flag2 = false
-                mouse1release()
+        end
+        if should then
+            if not Flag2 then
+                Flag2 = true
+                mouse1press()
             end
+        elseif Flag2 then
+            Flag2 = false
+            mouse1release()
+        end
+    end
+end
+
+local function SetTriggerEnabled(state)
+    getgenv().triggerb = state
+    if state then
+        if not TriggerConnection then
+            TriggerConnection = RunService.RenderStepped:Connect(TriggerRenderStep)
         end
     else
         if Flag2 then
             Flag2 = false
             mouse1release()
+        end
+        if TriggerConnection then
+            TriggerConnection:Disconnect()
+            TriggerConnection = nil
         end
     end
 end
@@ -435,24 +480,19 @@ local WeaponConfig = {
 }
 local infAmmoV2 = false
 
--- ======= 移动相关（动态连接） =======
+-- ======= 移动相关 =======
 local WalkSpeedConfig = { WalkSpeed = 16 }
 local SpeedEnabled = false
 local SpeedMethod = "Velocity"
-local speedConnection = nil
-
 local InfJumpEnabled = false
 local AntiAimEnabled = false
 local AntiAimSpinSpeed = 10
 local antiAimGyro = nil
 local NoClipEnabled = false
-local noclipConnection = nil
-
 local CollectDebris = false
 local DebrisFilter = "Both"
-local debrisConnection = nil
 
--- ======= 物品ESP =======
+-- ======= 物品ESP（原999） =======
 local ESPData = {}
 local function CreateESP(instance, text)
     local bill = Instance.new("BillboardGui")
@@ -471,28 +511,45 @@ local function CreateESP(instance, text)
     return bill
 end
 
+-- 优化：DescendantAdded 只连接一次，用启用集合判断，避免重复连接累积
+local ESPEnabledNames = {}
+local ESPConn = nil
+
+local function ESPDescendantAdded(obj)
+    if not obj:IsA("TouchTransmitter") then return end
+    local label = ESPEnabledNames[obj.Parent.Name]
+    if label and not obj.Parent:FindFirstChild("dontask") then
+        ESPData[obj.Parent] = CreateESP(obj.Parent, label)
+    end
+end
+
 local function ToggleESP(enable, name, label)
     if enable then
+        local n = 0
         for _, obj in ipairs(Workspace:GetDescendants()) do
+            n = n + 1
+            if n % 500 == 0 then task.wait() end
             if obj:IsA("TouchTransmitter") and obj.Parent.Name == name then
                 if not obj.Parent:FindFirstChild("dontask") then
                     ESPData[obj.Parent] = CreateESP(obj.Parent, label)
                 end
             end
         end
-        Workspace.DescendantAdded:Connect(function(obj)
-            if enable and obj:IsA("TouchTransmitter") and obj.Parent.Name == name then
-                if not obj.Parent:FindFirstChild("dontask") then
-                    ESPData[obj.Parent] = CreateESP(obj.Parent, label)
-                end
-            end
-        end)
+        ESPEnabledNames[name] = label
+        if not ESPConn then
+            ESPConn = Workspace.DescendantAdded:Connect(ESPDescendantAdded)
+        end
     else
+        ESPEnabledNames[name] = nil
         for obj, bill in pairs(ESPData) do
             if bill and bill:FindFirstChild("TextLabel") and bill.TextLabel.Text == label then
                 bill:Destroy()
                 ESPData[obj] = nil
             end
+        end
+        if next(ESPEnabledNames) == nil and ESPConn then
+            ESPConn:Disconnect()
+            ESPConn = nil
         end
     end
 end
@@ -515,7 +572,7 @@ local TerrainBackup = {
 local MaterialBackup = {}
 local EffectBackup = {}
 
--- ======= 皮肤 =======
+-- ======= 皮肤（原999） =======
 local ArmMaterial = "Plastic"
 local ArmColor = Color3.fromRGB(50,50,50)
 local ArmSkinEnabled = false
@@ -527,12 +584,11 @@ local RainbowPulse = false
 local waveCount = 1
 local pulseVal = 0
 function zigzag(x) return math.acos(math.cos(x*math.pi))/math.pi end
-local rainbowConnection = nil
 
 local NameSpoofEnabled = false
 local NameBackup = {}
 
--- ========================= FOV 吸附自瞄（已动态，无需改） =========================
+-- ========================= 新增：FOV 吸附自瞄（来自666） =========================
 local AimState = {
     enabled = false,
     wallAim = false,
@@ -541,7 +597,7 @@ local AimState = {
     enemyOnly = false,
     fovRadius = 150,
     maxDistance = 300,
-    smooth = 0.18,
+    smooth = 0.18,          -- 0.03~0.75
     aimPart = "Head",
     selected = nil,
     teamCheck = true,
@@ -552,6 +608,10 @@ local AimCurrentTarget = nil
 local AimFovCircle = nil
 local AimConnection = nil
 
+-- 优化：可见性射线检测缓存（每玩家0.1秒），减少自瞄开启时每帧射线数
+local AimVisCache = {}
+
+-- 工具函数
 local function Aim_char(plr) return plr and plr.Character end
 local function Aim_hum(plr)
     local c = Aim_char(plr)
@@ -591,7 +651,7 @@ local function Aim_getTargetPart(plr)
     if not c then return nil end
     local part = c:FindFirstChild(AimState.aimPart)
     if not part then
-        part = c:FindFirstChild("Head") or c:FindFirstChild("UpperTorso") or 
+        part = c:FindFirstChild("Head") or c:FindFirstChild("UpperTorso") or
                c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso")
     end
     if part and part:IsA("BasePart") and part.Name ~= "Handle" then return part end
@@ -608,6 +668,10 @@ local function Aim_isVisible(plr)
     local origin = cam.CFrame.Position
     local dir = head.Position - origin
     if dir.Magnitude <= 0.1 then return true end
+    local cached = AimVisCache[plr]
+    if cached and (os.clock() - cached.t) < 0.1 then
+        return cached.visible
+    end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local excl = {}
@@ -616,7 +680,9 @@ local function Aim_isVisible(plr)
     table.insert(excl, c)
     params.FilterDescendantsInstances = excl
     local hit = workspace:Raycast(origin, dir, params)
-    return not (hit and hit.Instance)
+    local visible = not (hit and hit.Instance)
+    AimVisCache[plr] = { visible = visible, t = os.clock() }
+    return visible
 end
 
 local function Aim_findPlayerByName(name)
@@ -742,6 +808,7 @@ local function Aim_stop()
         AimConnection = nil
     end
     AimCurrentTarget = nil
+    table.clear(AimVisCache)
 end
 
 local function Aim_setEnabled(enabled)
@@ -750,7 +817,7 @@ local function Aim_setEnabled(enabled)
     Aim_updateFovCircle()
 end
 
--- ========================= 玩家绘制（动态绑定） =========================
+-- ========================= 新增：玩家绘制模块（来自666） =========================
 do
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
@@ -768,7 +835,6 @@ do
         nameTags = false,
         friendWhitelist = {},
     }
-    local espStepConnection = nil
 
     local function safeDestroy(x)
         if x then pcall(function() x:Destroy() end) end
@@ -1131,16 +1197,7 @@ do
         end
     end
 
-    local function refreshEspBinding()
-        local shouldRun = state.enemyEsp or state.friendEsp or state.nameTags
-        if shouldRun and not espStepConnection then
-            espStepConnection = RunService:BindToRenderStep("DrawPlayerEspStep", Enum.RenderPriority.Camera.Value + 1, onRenderStep)
-        elseif not shouldRun and espStepConnection then
-            RunService:UnbindFromRenderStep("DrawPlayerEspStep")
-            espStepConnection = nil
-            clearVisuals()
-        end
-    end
+    RunService:BindToRenderStep("DrawPlayerEspStep", Enum.RenderPriority.Camera.Value + 1, onRenderStep)
 
     Players.PlayerAdded:Connect(function(plr) end)
     Players.PlayerRemoving:Connect(function(plr)
@@ -1151,25 +1208,18 @@ do
     LocalPlayer.CharacterAdded:Connect(function() end)
 
     getgenv().DrawPlayer = {
-        setEnemyEsp = function(v)
-            state.enemyEsp = v
-            refreshEspBinding()
-        end,
-        setFriendEsp = function(v)
-            state.friendEsp = v
-            refreshEspBinding()
-        end,
-        setTeamCheck = function(v)
-            state.teamCheck = v
-            refreshEspBinding()
-        end,
-        setUnknownAsEnemy = function(v)
-            state.unknownAsEnemy = v
-            refreshEspBinding()
-        end,
+        setEnemyEsp = function(v) state.enemyEsp = v end,
+        setFriendEsp = function(v) state.friendEsp = v end,
+        setTeamCheck = function(v) state.teamCheck = v end,
+        setUnknownAsEnemy = function(v) state.unknownAsEnemy = v end,
         setNameTags = function(v)
             state.nameTags = v
-            refreshEspBinding()
+            if not v then
+                for _, plr in ipairs(Players:GetPlayers()) do
+                    if plr ~= LocalPlayer then destroyPlayerTags(plr) end
+                end
+                table.clear(lastHpCache)
+            end
         end,
         addFriendWhitelist = function(name)
             state.friendWhitelist[name] = true
@@ -1181,7 +1231,7 @@ do
     }
 end
 
--- ========================= UI 构建 =========================
+-- ========================= UI 构建（使用 Library） =========================
 local MainGroup = Tabs.Main:AddLeftGroupbox("战斗基础")
 -- Hitbox
 MainGroup:AddToggle("HitboxToggle", { Text = "开启 Hitbox 扩大", Default = BooleanFlag }):AddKeyPicker("HitboxKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
@@ -1189,14 +1239,9 @@ Toggles.HitboxToggle:OnChanged(function(state)
     task.spawn(function()
         BooleanFlag = state
         if state then
-            if not hitboxConnection then
-                hitboxConnection = RunService.Heartbeat:Connect(UpdateHitboxes)
-            end
+            if not UnknownValue then UnknownValue = RunService.Heartbeat:Connect(HitboxTick) end
         else
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-                hitboxConnection = nil
-            end
+            if UnknownValue then UnknownValue:Disconnect() UnknownValue = nil end
             for plr in pairs(ConfigTable) do RestorePart(plr) end
         end
     end)
@@ -1223,20 +1268,15 @@ Options.GameMode:OnChanged(function(v)
     task.spawn(function() GameMode = v end)
 end)
 
--- 锁头（旧）
+-- 锁头（原999）
 MainGroup:AddToggle("LockToggle", { Text = "开启强锁头（旧）", Default = Flag1 }):AddKeyPicker("LockKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.LockToggle:OnChanged(function(state)
     task.spawn(function()
         Flag1 = state
         if state then
-            if not lockConnection then
-                lockConnection = RunService.RenderStepped:Connect(UpdateLock)
-            end
+            if not NullValue then NullValue = RunService.RenderStepped:Connect(UpdateLock) end
         else
-            if lockConnection then
-                lockConnection:Disconnect()
-                lockConnection = nil
-            end
+            if NullValue then NullValue:Disconnect() NullValue = nil end
             EnemyCharacter = nil
         end
     end)
@@ -1247,7 +1287,7 @@ Options.LockTarget:OnChanged(function(v)
     task.spawn(function() LockOnTarget = v; EnemyCharacter = nil end)
 end)
 
--- FOV 自瞄
+-- ===== FOV 自瞄（新增） =====
 local AimGroup = Tabs.Main:AddRightGroupbox("FOV 吸附自瞄")
 AimGroup:AddToggle("AimEnable", { Text = "开启 FOV 吸附", Default = AimState.enabled })
 Toggles.AimEnable:OnChanged(function(state)
@@ -1330,23 +1370,10 @@ Toggles.AimShowFov:OnChanged(function(state)
     end)
 end)
 
--- Triggerbot
+-- Triggerbot & Autofarm
 MainGroup:AddToggle("TriggerToggle", { Text = "开启自动开枪 (Triggerbot)", Default = getgenv().triggerb }):AddKeyPicker("TriggerKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.TriggerToggle:OnChanged(function(state)
-    task.spawn(function()
-        getgenv().triggerb = state
-        if state then
-            if not triggerConnection then
-                triggerConnection = RunService.RenderStepped:Connect(triggerLoop)
-            end
-        else
-            if triggerConnection then
-                triggerConnection:Disconnect()
-                triggerConnection = nil
-            end
-            if Flag2 then Flag2 = false; mouse1release() end
-        end
-    end)
+    task.spawn(function() SetTriggerEnabled(state) end)
 end)
 
 MainGroup:AddDropdown("TriggerMode", { Text = "Triggerbot 队伍", Values = {"混战模式","团队模式","所有模式"}, Default = GameType })
@@ -1380,22 +1407,32 @@ Toggles.InfAmmo1:OnChanged(function(state)
     end)
 end)
 
+-- 优化：无限弹药2 改为单一 Stepped 连接，修复反复开关导致连接堆积的卡顿
+local InfAmmoConnection = nil
+local function InfAmmoStep()
+    if not infAmmoV2 then return end
+    pcall(function()
+        local gui = LocalPlayer.PlayerGui
+        if gui and gui.GUI and gui.GUI.Client and gui.GUI.Client.Variables then
+            gui.GUI.Client.Variables.ammocount.Value = 99
+            gui.GUI.Client.Variables.ammocount2.Value = 99
+        end
+    end)
+end
+
 WeaponGroup:AddToggle("InfAmmo2", { Text = "无限弹药2 (本地)", Default = false })
 Toggles.InfAmmo2:OnChanged(function(state)
     task.spawn(function()
         infAmmoV2 = state
         if state then
-            RunService.Stepped:Connect(function()
-                pcall(function()
-                    if infAmmoV2 then
-                        local gui = LocalPlayer.PlayerGui
-                        if gui and gui.GUI and gui.GUI.Client and gui.GUI.Client.Variables then
-                            gui.GUI.Client.Variables.ammocount.Value = 99
-                            gui.GUI.Client.Variables.ammocount2.Value = 99
-                        end
-                    end
-                end)
-            end)
+            if not InfAmmoConnection then
+                InfAmmoConnection = RunService.Stepped:Connect(InfAmmoStep)
+            end
+        else
+            if InfAmmoConnection then
+                InfAmmoConnection:Disconnect()
+                InfAmmoConnection = nil
+            end
         end
     end)
 end)
@@ -1493,18 +1530,7 @@ local MoveGroup = Tabs.Move:AddLeftGroupbox("移动控制")
 MoveGroup:AddToggle("FlyToggle", { Text = "飞行", Default = false }):AddKeyPicker("FlyKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.FlyToggle:OnChanged(function(state)
     task.spawn(function()
-        if state then
-            FlyFunction()
-            if not flyConnection then
-                flyConnection = RunService.Heartbeat:Connect(flyLoop)
-            end
-        else
-            StopFlyingFunction()
-            if flyConnection then
-                flyConnection:Disconnect()
-                flyConnection = nil
-            end
-        end
+        if state then FlyFunction() else StopFlyingFunction() end
     end)
 end)
 
@@ -1513,33 +1539,38 @@ Options.FlySpeed:OnChanged(function(v)
     task.spawn(function() FlightSettings.flyspeed = v end)
 end)
 
+-- 优化：速度 Stepped 仅在开启时连接
+local SpeedConnection = nil
+local function SpeedStep(dt)
+    if not SpeedEnabled then return end
+    if LocalPlayer and LocalPlayer.Character then
+        local char = LocalPlayer.Character
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum and root then
+            if SpeedMethod == "Velocity" then
+                root.Velocity = Vector3.new(hum.MoveDirection.X * WalkSpeedConfig.WalkSpeed, root.Velocity.Y, hum.MoveDirection.Z * WalkSpeedConfig.WalkSpeed)
+            elseif SpeedMethod == "Vector" then
+                root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt * 0.0001
+            elseif SpeedMethod == "CFrame" then
+                root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt * 0.0001
+            end
+        end
+    end
+end
+
 MoveGroup:AddToggle("SpeedToggle", { Text = "自定义移动速度", Default = SpeedEnabled })
 Toggles.SpeedToggle:OnChanged(function(state)
     task.spawn(function()
         SpeedEnabled = state
         if state then
-            if not speedConnection then
-                speedConnection = RunService.Stepped:Connect(function(dt)
-                    if SpeedEnabled and LocalPlayer and LocalPlayer.Character then
-                        local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hum and root then
-                            if SpeedMethod == "Velocity" then
-                                root.Velocity = Vector3.new(hum.MoveDirection.X * WalkSpeedConfig.WalkSpeed, root.Velocity.Y, hum.MoveDirection.Z * WalkSpeedConfig.WalkSpeed)
-                            elseif SpeedMethod == "Vector" then
-                                root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt * 0.0001
-                            elseif SpeedMethod == "CFrame" then
-                                root.CFrame = root.CFrame + hum.MoveDirection * WalkSpeedConfig.WalkSpeed * dt * 0.0001
-                            end
-                        end
-                    end
-                end)
+            if not SpeedConnection then
+                SpeedConnection = RunService.Stepped:Connect(SpeedStep)
             end
         else
-            if speedConnection then
-                speedConnection:Disconnect()
-                speedConnection = nil
+            if SpeedConnection then
+                SpeedConnection:Disconnect()
+                SpeedConnection = nil
             end
         end
     end)
@@ -1608,65 +1639,100 @@ Options.SpinSpeed:OnChanged(function(v)
     end)
 end)
 
+-- 优化：穿墙改为“事件驱动 + 低频重断言”，不再每帧遍历全身零件
+local NoClipHeartbeat = nil
+local noClipTimer = 0
+local noClipCharConn = nil
+local noClipAddedConn = nil
+
+local function ApplyNoclip(enable)
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = not enable end
+        end
+    end
+end
+
+local function NoClipTick(dt)
+    if not NoClipEnabled then return end
+    noClipTimer = noClipTimer + dt
+    if noClipTimer >= 0.25 then
+        noClipTimer = 0
+        ApplyNoclip(true)
+    end
+end
+
+local function ConnectNoClip()
+    local char = LocalPlayer.Character
+    if char and not noClipCharConn then
+        noClipCharConn = char.DescendantAdded:Connect(function(part)
+            if NoClipEnabled and part:IsA("BasePart") then part.CanCollide = false end
+        end)
+    end
+    if not NoClipHeartbeat then
+        NoClipHeartbeat = RunService.Heartbeat:Connect(NoClipTick)
+    end
+end
+
+local function DisconnectNoClip()
+    if noClipCharConn then
+        noClipCharConn:Disconnect()
+        noClipCharConn = nil
+    end
+    if NoClipHeartbeat then
+        NoClipHeartbeat:Disconnect()
+        NoClipHeartbeat = nil
+    end
+    ApplyNoclip(false)
+end
+
 MoveGroup:AddToggle("NoClipToggle", { Text = "穿墙 (Noclip)", Default = NoClipEnabled })
 Toggles.NoClipToggle:OnChanged(function(state)
     task.spawn(function()
         NoClipEnabled = state
         if state then
-            if not noclipConnection then
-                noclipConnection = RunService.Heartbeat:Connect(function()
+            ConnectNoClip()
+            if not noClipAddedConn then
+                noClipAddedConn = LocalPlayer.CharacterAdded:Connect(function()
                     if NoClipEnabled then
-                        local char = LocalPlayer.Character
-                        if char then
-                            for _, part in pairs(char:GetDescendants()) do
-                                if part:IsA("BasePart") then part.CanCollide = false end
-                            end
-                        end
+                        task.wait(0.15)
+                        ConnectNoClip()
                     end
                 end)
             end
         else
-            if noclipConnection then
-                noclipConnection:Disconnect()
-                noclipConnection = nil
-            end
-            local char = LocalPlayer.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
-                end
+            DisconnectNoClip()
+            if noClipAddedConn then
+                noClipAddedConn:Disconnect()
+                noClipAddedConn = nil
             end
         end
     end)
 end)
 
+-- 优化：物品传送频率 0.1s -> 0.3s，10Hz 降为约 3Hz，肉眼无差别
 MoveGroup:AddToggle("CollectDebrisToggle", { Text = "物品传送", Default = CollectDebris })
 Toggles.CollectDebrisToggle:OnChanged(function(state)
     task.spawn(function()
         CollectDebris = state
         if state then
-            if not debrisConnection then
-                debrisConnection = RunService.Heartbeat:Connect(function()
-                    if CollectDebris then
-                        pcall(function()
-                            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            if root then
-                                for _, item in pairs(Workspace.Debris:GetChildren()) do
-                                    local name = item.Name
-                                    if DebrisFilter == "Both" or (DebrisFilter == "DeadHP" and name == "DeadHP") or (DebrisFilter == "DeadAmmo" and name == "DeadAmmo") then
-                                        item.CFrame = root.CFrame * CFrame.new(0,0.2,0)
-                                    end
+            task.spawn(function()
+                while CollectDebris do
+                    pcall(function()
+                        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if root then
+                            for _, item in pairs(Workspace.Debris:GetChildren()) do
+                                local name = item.Name
+                                if DebrisFilter == "Both" or (DebrisFilter == "DeadHP" and name == "DeadHP") or (DebrisFilter == "DeadAmmo" and name == "DeadAmmo") then
+                                    item.CFrame = root.CFrame * CFrame.new(0,0.2,0)
                                 end
                             end
-                        end)
-                    end
-                end)
-            end
-        else
-            if debrisConnection then
-                debrisConnection:Disconnect()
-                debrisConnection = nil
-            end
+                        end
+                    end)
+                    task.wait(0.3)
+                end
+            end)
         end
     end)
 end)
@@ -1683,6 +1749,7 @@ end)
 -- ========================= 视觉 Tab =========================
 local VisualGroup = Tabs.Visual:AddLeftGroupbox("视觉")
 
+-- 物品ESP
 VisualGroup:AddToggle("AmmoESP", { Text = "弹药 ESP", Default = false })
 Toggles.AmmoESP:OnChanged(function(state)
     task.spawn(function() ToggleESP(state, "DeadAmmo", "弹药箱") end)
@@ -1693,6 +1760,7 @@ Toggles.HealthESP:OnChanged(function(state)
     task.spawn(function() ToggleESP(state, "DeadHP", "补血箱") end)
 end)
 
+-- 全局视觉
 VisualGroup:AddToggle("FullBright", { Text = "全局光亮", Default = false })
 Toggles.FullBright:OnChanged(function(state)
     task.spawn(function()
@@ -1718,10 +1786,14 @@ Toggles.NoShadows:OnChanged(function(state)
     task.spawn(function() LightingService.GlobalShadows = not state end)
 end)
 
+-- 优化：X射线遍历时每500个实例让出线程，避免一次性扫描卡顿
 VisualGroup:AddToggle("XRay", { Text = "X射线透视", Default = false })
 Toggles.XRay:OnChanged(function(state)
     task.spawn(function()
+        local n = 0
         for _, obj in pairs(Workspace:GetDescendants()) do
+            n = n + 1
+            if n % 500 == 0 then task.wait() end
             if obj:IsA("BasePart") then
                 if state then
                     if not obj:FindFirstChild("OriginalTransparency") then
@@ -1746,14 +1818,20 @@ VisualGroup:AddToggle("LowLatency", { Text = "低延迟", Default = false })
 Toggles.LowLatency:OnChanged(function(state)
     task.spawn(function()
         if state then
+            local n = 0
             for _, obj in pairs(Workspace:GetDescendants()) do
+                n = n + 1
+                if n % 500 == 0 then task.wait() end
                 if obj:IsA("BasePart") and not obj.Parent:FindFirstChild("Humanoid") then
                     MaterialBackup[obj] = obj.Material
                     obj.Material = Enum.Material.SmoothPlastic
                 end
             end
         else
+            local n = 0
             for obj, mat in pairs(MaterialBackup) do
+                n = n + 1
+                if n % 500 == 0 then task.wait() end
                 if obj and obj:IsA("BasePart") then obj.Material = mat end
             end
             MaterialBackup = {}
@@ -1778,7 +1856,10 @@ Toggles.FPSBoost:OnChanged(function(state)
             LightingService.FogEnd = 387420489
             LightingService.Brightness = 0
             settings().Rendering.QualityLevel = "Level01"
+            local n = 0
             for _, obj in pairs(game:GetDescendants()) do
+                n = n + 1
+                if n % 500 == 0 then task.wait() end
                 if obj:IsA("Part") or obj:IsA("Union") or obj:IsA("CornerWedgePart") or obj:IsA("TrussPart") or obj:IsA("MeshPart") then
                     MaterialBackup[obj] = obj.Material
                     obj.Material = "Plastic"
@@ -1810,7 +1891,10 @@ Toggles.FPSBoost:OnChanged(function(state)
             LightingService.FogEnd = LightingBackup.FogEnd
             LightingService.Brightness = LightingBackup.Brightness
             settings().Rendering.QualityLevel = "Automatic"
+            local n = 0
             for obj, mat in pairs(MaterialBackup) do
+                n = n + 1
+                if n % 500 == 0 then task.wait() end
                 if obj and obj:IsA("BasePart") then
                     obj.Material = mat
                     obj.Reflectance = 0
@@ -1825,7 +1909,7 @@ Toggles.FPSBoost:OnChanged(function(state)
     end)
 end)
 
--- ===== 玩家绘制 =====
+-- ===== 玩家绘制（新增） =====
 local PlayerEspGroup = Tabs.Visual:AddRightGroupbox("玩家绘制")
 PlayerEspGroup:AddToggle("DrawEnemyEsp", { Text = "启用敌人ESP (高亮)", Default = false })
 Toggles.DrawEnemyEsp:OnChanged(function(state)
@@ -1865,6 +1949,7 @@ Options.ArmColor:OnChanged(function(text)
     if r and g and b then ArmColor = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b)) end
 end)
 
+-- 优化：皮肤循环频率 0.01s -> 0.1s（10Hz），效果不变但负载降10倍
 SkinGroup:AddToggle("ArmSkinToggle", { Text = "启用手臂皮肤", Default = ArmSkinEnabled })
 Toggles.ArmSkinToggle:OnChanged(function(state)
     task.spawn(function()
@@ -1890,7 +1975,7 @@ Toggles.ArmSkinToggle:OnChanged(function(state)
                             end
                         end
                     end
-                    task.wait(0.01)
+                    task.wait(0.1)
                 end
             end)
         end
@@ -1924,63 +2009,50 @@ Toggles.GunSkinToggle:OnChanged(function(state)
                             end
                         end
                     end
-                    task.wait(0.01)
+                    task.wait(0.1)
                 end
             end)
         end
     end)
 end)
 
--- 彩虹效果（动态连接）
-local function updateRainbow()
-    if RainbowWave or RainbowPulse then
-        if not rainbowConnection then
-            rainbowConnection = RunService.RenderStepped:Connect(function()
-                if not (RainbowWave or RainbowPulse) then
-                    if rainbowConnection then
-                        rainbowConnection:Disconnect()
-                        rainbowConnection = nil
-                    end
-                    return
-                end
-                if workspace.Camera:FindFirstChild("Arms") then
-                    local arms = workspace.Camera.Arms
-                    for _, obj in pairs(arms:GetDescendants()) do
-                        if obj:IsA("MeshPart") then
-                            if RainbowWave then
-                                obj.Color = Color3.fromHSV(zigzag(waveCount), 1, 1)
-                                waveCount = waveCount + 0.0001
-                            elseif RainbowPulse then
-                                pulseVal = (pulseVal + 0.1) % 1
-                                obj.Color = Color3.fromHSV(pulseVal, 1, 1)
-                            end
-                        end
-                    end
-                end
-            end)
+-- 优化：彩虹效果 RenderStepped 仅在开启时连接
+local RainbowConnection = nil
+local function RainbowStep()
+    if not (RainbowWave or RainbowPulse) then return end
+    local arms = workspace.Camera:FindFirstChild("Arms")
+    if not arms then return end
+    for _, obj in pairs(arms:GetDescendants()) do
+        if obj:IsA("MeshPart") then
+            if RainbowWave then
+                obj.Color = Color3.fromHSV(zigzag(waveCount), 1, 1)
+                waveCount = waveCount + 0.0001
+            elseif RainbowPulse then
+                pulseVal = (pulseVal + 0.1) % 1
+                obj.Color = Color3.fromHSV(pulseVal, 1, 1)
+            end
         end
-    else
-        if rainbowConnection then
-            rainbowConnection:Disconnect()
-            rainbowConnection = nil
-        end
+    end
+end
+
+local function UpdateRainbowConnection()
+    local on = RainbowWave or RainbowPulse
+    if on and not RainbowConnection then
+        RainbowConnection = RunService.RenderStepped:Connect(RainbowStep)
+    elseif not on and RainbowConnection then
+        RainbowConnection:Disconnect()
+        RainbowConnection = nil
     end
 end
 
 SkinGroup:AddToggle("RainbowWave", { Text = "彩虹效果（波浪）", Default = RainbowWave })
 Toggles.RainbowWave:OnChanged(function(state)
-    task.spawn(function()
-        RainbowWave = state
-        updateRainbow()
-    end)
+    task.spawn(function() RainbowWave = state; UpdateRainbowConnection() end)
 end)
 
 SkinGroup:AddToggle("RainbowPulse", { Text = "彩虹效果（脉冲）", Default = RainbowPulse })
 Toggles.RainbowPulse:OnChanged(function(state)
-    task.spawn(function()
-        RainbowPulse = state
-        updateRainbow()
-    end)
+    task.spawn(function() RainbowPulse = state; UpdateRainbowConnection() end)
 end)
 
 -- ========================= 其他 Tab =========================
@@ -2072,17 +2144,21 @@ Options.TimeScale:OnChanged(function(text)
     end)
 end)
 
--- ========================= UI Tab =========================
+-- ========================= UI Tab（仅主题，无配置管理） =========================
+-- 修复：添加 ThemeManager:SetLibrary(Library) 以使主题控件显示
 ThemeManager:SetLibrary(Library)
 ThemeManager:ApplyToTab(Tabs.UI)
+
+-- 为了美观，添加一个标签说明
 local uiGroup = Tabs.UI:AddLeftGroupbox("主题设置")
 uiGroup:AddLabel("使用下方按钮切换主题")
 
 Library:Notify("兵工厂", "功能已加载，请查看各标签页", 4)
 
--- ========================= 悬浮窗 =========================
+-- ========================= 新增：悬浮窗（手机/电脑通用） =========================
 task.spawn(function()
-    task.wait(0.8)
+    task.wait(0.8)  -- 确保主窗口完全初始化
+
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "FloatingMenu"
     screenGui.ResetOnSpawn = false
@@ -2090,7 +2166,7 @@ task.spawn(function()
 
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 60, 0, 60)
-    frame.Position = UDim2.new(0, 16, 0, 120)
+    frame.Position = UDim2.new(0, 16, 0, 120)  -- 初始左上角
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     frame.BackgroundTransparency = 0.25
     frame.BorderSizePixel = 0
@@ -2131,7 +2207,7 @@ task.spawn(function()
 
     local isDragging = false
     frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
             isDragging = false
             local startPos = input.Position
@@ -2146,7 +2222,7 @@ task.spawn(function()
     end)
 
     frame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
             task.wait(0.05)
             if not isDragging then
@@ -2156,9 +2232,9 @@ task.spawn(function()
     end)
 end)
 
--- ========================= 电脑端快捷键 =========================
+-- ========================= 电脑端快捷键：右Shift 切换主窗口 =========================
 InputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+    if gameProcessed then return end  -- 忽略游戏内输入框等
     if input.KeyCode == Enum.KeyCode.RightShift then
         if Window then
             if Window.Toggle then

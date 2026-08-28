@@ -760,13 +760,19 @@ local function Aim_updateFovCircle()
     if AimState.showFov then
         if not AimFovCircle or not AimFovCircle.Parent then
             local gui = Instance.new("ScreenGui")
-            gui.Name = "AimFovGui"
-            gui.ResetOnSpawn = false
-            gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-            AimFovCircle = Instance.new("Frame")
-            AimFovCircle.Name = "FovCircle"
-            AimFovCircle.Size = UDim2.fromOffset(AimState.fovRadius * 2, AimState.fovRadius * 2)
-            AimFovCircle.Position = UDim2.new(0.5, -AimState.fovRadius, 0.5, -AimState.fovRadius)
+gui.Name = "AimFovGui"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true  -- 【新增】忽略顶部安全区，防止偏移
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+AimFovCircle = Instance.new("Frame")
+AimFovCircle.Name = "FovCircle"
+AimFovCircle.AnchorPoint = Vector2.new(0.5, 0.5)  
+AimFovCircle.Size = UDim2.fromOffset(AimState.fovRadius * 2, AimState.fovRadius * 2)
+AimFovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)  
+AimFovCircle.BackgroundTransparency = 1
+AimFovCircle.BorderSizePixel = 0
+AimFovCircle.Parent = gui
             AimFovCircle.BackgroundTransparency = 1
             AimFovCircle.BorderSizePixel = 0
             AimFovCircle.Parent = gui

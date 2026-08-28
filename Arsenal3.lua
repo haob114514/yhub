@@ -786,7 +786,7 @@ AimFovCircle.Parent = gui
             stroke.Parent = AimFovCircle
         end
         AimFovCircle.Size = UDim2.fromOffset(AimState.fovRadius * 2, AimState.fovRadius * 2)
-        AimFovCircle.Position = UDim2.new(0.5, -AimState.fovRadius, 0.5, -AimState.fovRadius)
+        AimFovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
         AimFovCircle.Visible = true
     else
         if AimFovCircle then AimFovCircle.Visible = false end

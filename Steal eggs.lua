@@ -1,4 +1,4 @@
-local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/Wlzhmaa/UWU/refs/heads/main/Chinese%20translation"))
+local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/haob114514/yhub/refs/heads/main/TX.lua"))
 main()
 
 task.wait(8) 

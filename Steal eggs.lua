@@ -1,4 +1,4 @@
-local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/haob114514/yhub/refs/heads/main/TX.lua"))
+local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/ShenJiaoBen/Partial-Server-Ribbon/refs/heads/main/Auto-language.txt"))
 main()
 
 task.wait(8) 

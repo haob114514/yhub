@@ -1,7 +1,8 @@
-local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/ShenJiaoBen/Partial-Server-Ribbon/refs/heads/main/Auto-language.txt"))
-main()
+TX = "TX Script"
+Script = "全自动翻译"
 
-task.wait(8) 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JsYb666/Item/refs/heads/main/Auto-language"))()
 
-local translate = loadstring(game:HttpGet("https://raw.githubusercontent.com/Ryuun0x/Clover/main/main.lua"))
-translate()
+wait(8)  
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Ryuun0x/Clover/main/main.lua"))()

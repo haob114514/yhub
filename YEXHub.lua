@@ -144,7 +144,7 @@ local function createUI()
 
         
         ScriptTab:Button({
-            Title = "监狱人生（有bug暂停使用）",
+            Title = "监狱人生",
             Color = Color3.fromHex("999999"),
             Justify = "Center",
             Icon = "sword",
@@ -156,6 +156,26 @@ local function createUI()
                 end)
                 if not ok then
                     WindUI:Notify({ Title = "加载失败", Content = "监狱人生出错: "..tostring(err), Duration = 5 })
+                end
+            end
+        })
+
+        pcall(function() ScriptTab:Divider() end)
+
+        -- 新增：偷蛋服务器按钮
+        ScriptTab:Button({
+            Title = "偷蛋",
+            Color = Color3.fromHex("999999"),
+            Justify = "Center",
+            Icon = "egg",
+            IconAlign = "Left",
+            Callback = function()
+                Window:Destroy()
+                local ok, err = pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/haob114514/yhub/refs/heads/main/Stealegg1.lua"))()
+                end)
+                if not ok then
+                    WindUI:Notify({ Title = "加载失败", Content = "偷蛋出错: "..tostring(err), Duration = 5 })
                 end
             end
         })

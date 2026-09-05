@@ -1,11 +1,10 @@
--- ========== 第一步：发送注入成功通知 ==========
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "YEX Hub加载器",
     Text = "脚本已注入，正在加载 UI...",
     Duration = 3
 })
 
--- ========== 环境净化（原代码保持不变） ==========
+
 local Env = getfenv()
 local LogService = game:GetService("LogService")
 local getconnections = Env.getconnections
@@ -26,7 +25,7 @@ end
 cleanupConnections()
 print("✅ 环境净化完成")
 
--- ========== 加载 WindUI ==========
+
 local WindUI
 do
     local ok, result = pcall(function()
@@ -39,7 +38,7 @@ do
     end
 end
 
--- 检查 WindUI 是否加载成功
+
 if not WindUI or not WindUI.CreateWindow then
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "加载失败",
@@ -49,7 +48,7 @@ if not WindUI or not WindUI.CreateWindow then
     error("WindUI 库未正确加载")
 end
 
--- ========== 创建 UI ==========
+
 local function createUI()
     local success, err = pcall(function()
         local Window = WindUI:CreateWindow({
@@ -75,14 +74,14 @@ local function createUI()
             Topbar = { Height = 44, ButtonsType = "Mac" }
         })
 
-        -- ========== ✨【圆角处理（修复版）】==========
+        
         task.spawn(function()
-            task.wait(0.2) -- 等待 WindUI 内部渲染完成
+            task.wait(0.2) 
 
             local mainFrame = Window.UIElements and Window.UIElements.Main
             if not mainFrame then return end
 
-            -- 只让最外层 Main 负责圆角和裁剪，避免子元素互相覆盖圆角
+            
             local corner = mainFrame:FindFirstChildOfClass("UICorner")
             if not corner then
                 corner = Instance.new("UICorner")
@@ -91,10 +90,10 @@ local function createUI()
             end
             corner.CornerRadius = UDim.new(0, 16)
 
-            -- 关键：裁剪所有子元素，防止背景图片/遮罩/内容露出方角
+            
             mainFrame.ClipsDescendants = true
 
-            -- 侧边栏保持圆角，但不再递归修改所有后代
+            
             local sidebar = mainFrame:FindFirstChild("SideBar")
             if sidebar then
                 local sidebarCorner = sidebar:FindFirstChildOfClass("UICorner")
@@ -108,12 +107,12 @@ local function createUI()
             end
         end)
 
-        -- ========== 圆角处理结束 ==========
+        
 
-        -- 装饰标签
+        
         Window:Tag({ Title = "请选择服务器", Radius = 10, Color = Color3.fromHex("#ffffff") })
 
-        -- 只保留一个选项卡
+        
         local ScriptTab = Window:Tab({
             Title = "服务器",
             Desc = "点击按钮加载对应脚本",
@@ -123,7 +122,7 @@ local function createUI()
             Border = true,
         })
 
-        -- 按钮1：兵工厂
+        
         ScriptTab:Button({
             Title = "兵工厂",
             Color = Color3.fromHex("999999"),
@@ -143,25 +142,25 @@ local function createUI()
 
         pcall(function() ScriptTab:Divider() end)
 
-        -- 按钮2：偷走一个蛋
+        
         ScriptTab:Button({
-            Title = "偷走一个蛋（老外的）",
+            Title = "监狱人生",
             Color = Color3.fromHex("999999"),
             Justify = "Center",
-            Icon = "egg",
+            Icon = "sword",
             IconAlign = "Left",
             Callback = function()
                 Window:Destroy()
                 local ok, err = pcall(function()
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/haob114514/yhub/refs/heads/main/Steal%20eggs.lua"))()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/haob114514/yhub/refs/heads/main/Prisonlife1.lua"))()
                 end)
                 if not ok then
-                    WindUI:Notify({ Title = "加载失败", Content = "偷蛋出错: "..tostring(err), Duration = 5 })
+                    WindUI:Notify({ Title = "加载失败", Content = "监狱人生出错: "..tostring(err), Duration = 5 })
                 end
             end
         })
 
-        -- 黑白渐变边框（保留）
+        
         local function startGrayscaleBorder()
             local mainFrame = Window.UIElements and Window.UIElements.Main
             if not mainFrame then return end
@@ -210,7 +209,7 @@ local function createUI()
             overlay.BorderSizePixel = 0
             overlay.ZIndex = 0
 
-            -- 遮罩也使用相同圆角，避免覆盖 Main 的圆角效果
+            
             local overlayCorner = Instance.new("UICorner")
             overlayCorner.Name = "OverlayCorner"
             overlayCorner.CornerRadius = UDim.new(0, 16)

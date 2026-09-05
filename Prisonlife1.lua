@@ -2,7 +2,7 @@ local okLoad, WindUI = pcall(function()
     return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 end)
 if not okLoad or not WindUI then
-    warn("[监狱人生] WindUI 加载失败，UI 未启动")
+    warn("[Prison life] WindUI 加载失败，UI 未启动")
     return
 end
 
@@ -81,8 +81,12 @@ local function makeRef(id, defaultValue, setter)
     end
 
     function ref:SetValues(values)
-        if self.UI and self.UI.SetValues then
-            pcall(function() self.UI:SetValues(values) end)
+        if self.UI then
+            if self.UI.Refresh then
+                pcall(function() self.UI:Refresh(values or {}) end)
+            elseif self.UI.SetValues then
+                pcall(function() self.UI:SetValues(values or {}) end)
+            end
         end
     end
 
@@ -151,40 +155,56 @@ local function wrapContainer(container)
 
     function proxy:AddToggle(id, cfg)
         cfg = cfg or {}
-        local ref
-        ref = makeRef(id, cfg.Default == true, function(v)
-            if type(cfg.Callback) == "function" then cfg.Callback(v) end
+        local defaultValue = cfg.Default == true
+        local ref = makeRef(id, defaultValue, function(v)
+            if type(cfg.Callback) == "function" then pcall(cfg.Callback, v) end
         end)
 
         local item = container:Toggle({
             Title = cfg.Text or cfg.Title or id,
             Desc = cfg.Description or cfg.Desc,
-            Default = cfg.Default == true,
-            Callback = function(v) ref:SetValue(v) end,
+            Value = defaultValue,
+            Callback = function(v)
+                ref:SetValue(v)
+            end,
         })
 
-        ref.UI = item
-        Toggles[id] = ref
-        function item:AddKeyPicker(keyId, keyCfg)
-            return makeKeyPicker(ref, keyId, keyCfg, item)
+        if item then
+            ref.UI = item
+            Toggles[id] = ref
+            item.AddKeyPicker = item.AddKeyPicker or function(self, keyId, keyCfg)
+                return makeKeyPicker(ref, keyId, keyCfg, self)
+            end
         end
         return item
     end
 
     function proxy:AddSlider(id, cfg)
         cfg = cfg or {}
-        local ref = makeRef(id, cfg.Default, function(v)
-            if type(cfg.Callback) == "function" then cfg.Callback(v) end
+        local defaultValue = cfg.Default
+        if defaultValue == nil then defaultValue = cfg.Min or 0 end
+
+        -- Preserve the original public id as the option key.
+        local ref = makeRef(id, defaultValue, function(v)
+            if type(cfg.Callback) == "function" then pcall(cfg.Callback, v) end
         end)
+
         local item = container:Slider({
             Title = cfg.Text or cfg.Title or id,
             Desc = cfg.Description or cfg.Desc,
-            Value = { Min = cfg.Min, Max = cfg.Max, Default = cfg.Default },
+            Value = {
+                Min = cfg.Min or 0,
+                Max = cfg.Max or 100,
+                Default = defaultValue,
+            },
             Step = cfg.Step or ((cfg.Rounding or 0) == 0 and 1 or 0.1),
             IsTooltip = true,
             Suffix = cfg.Suffix,
-            Callback = function(v) ref:SetValue(v) end,
+            Callback = function(v)
+                ref:SetValue(v)
+            end,
         })
+
         ref.UI = item
         Options[id] = ref
         return item
@@ -192,17 +212,43 @@ local function wrapContainer(container)
 
     function proxy:AddDropdown(id, cfg)
         cfg = cfg or {}
-        local ref = makeRef(id, cfg.Default, function(v)
-            if type(cfg.Callback) == "function" then cfg.Callback(v) end
+        local defaultValue = cfg.Default
+
+        -- WindUI expects Value instead of Default. Multi dropdowns use a table.
+        if cfg.Multi then
+            if type(defaultValue) ~= "table" then
+                defaultValue = {}
+            end
+        else
+            if type(defaultValue) == "number" and defaultValue == 0 then
+                defaultValue = nil
+            end
+            if defaultValue == nil and cfg.Values and #cfg.Values > 0 then
+                defaultValue = nil
+            end
+        end
+
+        local ref = makeRef(id, defaultValue, function(v)
+            if type(cfg.Callback) == "function" then pcall(cfg.Callback, v) end
         end)
-        local item = container:Dropdown({
+
+        local config = {
             Title = cfg.Text or cfg.Title or id,
             Desc = cfg.Description or cfg.Desc,
             Values = cfg.Values or {},
             Multi = cfg.Multi == true,
-            Value = cfg.Default,
-            Callback = function(v) ref:SetValue(v) end,
-        })
+            Callback = function(v)
+                ref:SetValue(v)
+            end,
+        }
+
+        if defaultValue ~= nil then
+            config.Value = defaultValue
+        elseif cfg.Multi then
+            config.Value = {}
+        end
+
+        local item = container:Dropdown(config)
         ref.UI = item
         Options[id] = ref
         return item
@@ -210,17 +256,23 @@ local function wrapContainer(container)
 
     function proxy:AddInput(id, cfg)
         cfg = cfg or {}
-        local ref = makeRef(id, cfg.Default or "", function(v)
-            if type(cfg.Callback) == "function" then cfg.Callback(v) end
+        local defaultValue = cfg.Default or ""
+        local ref = makeRef(id, defaultValue, function(v)
+            if type(cfg.Callback) == "function" then pcall(cfg.Callback, v) end
         end)
+
         local item = container:Input({
             Title = cfg.Text or cfg.Title or id,
             Desc = cfg.Description or cfg.Desc,
-            PlaceholderText = cfg.PlaceholderText or cfg.Placeholder,
-            Default = cfg.Default,
-            Numeric = cfg.Numeric,
-            Callback = function(v) ref:SetValue(v) end,
+            Placeholder = cfg.PlaceholderText or cfg.Placeholder or "",
+            Value = defaultValue,
+            Type = cfg.Type or "Input",
+            InputIcon = cfg.InputIcon,
+            Callback = function(v)
+                ref:SetValue(v)
+            end,
         })
+
         ref.UI = item
         Options[id] = ref
         return item
@@ -228,49 +280,69 @@ local function wrapContainer(container)
 
     function proxy:AddButton(a, b)
         local cfg
-        if type(a) == "table" then cfg = a else cfg = { Title = tostring(a), Callback = b } end
+        if type(a) == "table" then
+            cfg = a
+        else
+            cfg = { Title = tostring(a), Callback = b }
+        end
+
         return container:Button({
             Title = cfg.Title or cfg.Text or "按钮",
-            Description = cfg.Description or cfg.Desc,
+            Desc = cfg.Description or cfg.Desc,
             Icon = cfg.Icon,
             Callback = cfg.Callback,
         })
     end
 
     function proxy:AddLabel(text)
-        local item = container:Paragraph({ Title = tostring(text or ""), Desc = "" })
+        local item = container:Paragraph({
+            Title = tostring(text or ""),
+            Desc = "",
+        })
+
         function item:AddColorPicker(id, cfg)
             cfg = cfg or {}
             local ref = makeRef(id, cfg.Default, function(v)
-                if type(cfg.Callback) == "function" then cfg.Callback(v) end
+                if type(cfg.Callback) == "function" then pcall(cfg.Callback, v) end
             end)
+
             local picker
             local ok, result = pcall(function()
                 return container:Colorpicker({
                     Title = cfg.Title or tostring(text or id),
                     Default = cfg.Default,
-                    Callback = function(v) ref:SetValue(v) end,
+                    Callback = function(v)
+                        ref:SetValue(v)
+                    end,
                 })
             end)
-            if ok and result then picker = result else
+
+            if ok and result then
+                picker = result
+            else
                 local ok2, result2 = pcall(function()
                     return item:Colorpicker({
                         Title = cfg.Title or tostring(text or id),
                         Default = cfg.Default,
-                        Callback = function(v) ref:SetValue(v) end,
+                        Callback = function(v)
+                            ref:SetValue(v)
+                        end,
                     })
                 end)
                 if ok2 then picker = result2 end
             end
+
             ref.UI = picker
             Options[id] = ref
             return item
         end
+
         function item:AddKeyPicker(id, cfg)
             local ref = makeRef(id, false)
             Options[id] = ref
             return makeKeyPicker(ref, id, cfg, item)
         end
+
         return item
     end
 
@@ -283,12 +355,14 @@ local function wrapContainer(container)
     end
 
     function proxy:AddDivider()
-        if container.Divider then pcall(function() container:Divider() end) end
+        if container.Divider then
+            pcall(function() container:Divider() end)
+        end
         return container
     end
 
     function proxy:AddLeftGroupbox(title)
-        local section
+        local section = container
         local ok, result = pcall(function()
             return container:Section({
                 Title = tostring(title or "功能"),
@@ -297,7 +371,11 @@ local function wrapContainer(container)
                 Opened = true,
             })
         end)
-        if ok and result then section = result else section = container end
+
+        if ok and result then
+            section = result
+        end
+
         return wrapContainer(section)
     end
 
@@ -307,7 +385,7 @@ local function wrapContainer(container)
 
     function proxy:AddCollapsibleSection(cfg)
         cfg = cfg or {}
-        local section
+        local section = container
         local ok, result = pcall(function()
             return container:Section({
                 Title = cfg.Title or "功能",
@@ -317,18 +395,25 @@ local function wrapContainer(container)
                 Opened = cfg.Open ~= false,
             })
         end)
-        if ok and result then section = result else section = container end
+
+        if ok and result then
+            section = result
+        end
+
         return wrapContainer(section)
     end
 
     function proxy:Space()
-        if container.Space then return container:Space() end
+        if container.Space then
+            return container:Space()
+        end
     end
 
     return proxy
 end
 
-local function wrapTab(tab)
+
+print("[YEX Hub] WindUI compatibility wrapper loaded")\n\nlocal function wrapTab(tab)
     return wrapContainer(tab)
 end
 

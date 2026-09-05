@@ -144,7 +144,7 @@ local function createUI()
 
         
         ScriptTab:Button({
-            Title = "监狱人生",
+            Title = "监狱人生（有bug暂停使用）",
             Color = Color3.fromHex("999999"),
             Justify = "Center",
             Icon = "sword",

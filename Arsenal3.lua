@@ -1182,418 +1182,301 @@ local function Aim_setEnabled(enabled)
     Aim_updateFovCircle()
 end
 
--- 玩家绘制（身份牌只显示敌人）
+-- ===================== 玩家绘制（Drawing API，与 Arsenal4 一致） =====================
+local PlayerESP = {
+    Enabled = false,
+    ShowTeammates = false,
+    Box = false,
+    Skeleton = false,
+    Chams = false,
+    Health = false,
+    Name = false,
+    Tracers = false,
+    Distance = false,
+    MaxDistance = 150,
+}
+
 do
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local Workspace = game:GetService("Workspace")
-    local Camera = workspace.CurrentCamera
+    local drawingPool = {}
+    local chams = {}
 
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-    local state = {
-        enemyEsp = false,
-        friendEsp = false,
-        teamCheck = true,
-        unknownAsEnemy = false,
-        nameTags = false,
-        friendWhitelist = {},
-    }
-
-    local function safeDestroy(x)
-        if x then pcall(function() x:Destroy() end) end
+    local function getOrCreateDrawing(player, key, class)
+        if not drawingPool[player] then drawingPool[player] = {} end
+        local pool = drawingPool[player]
+        if not pool[key] then
+            local obj = Drawing.new(class)
+            obj.Visible = false
+            pool[key] = obj
+        end
+        return pool[key]
     end
 
-    local function char(plr)
-        return plr and plr.Character
+    local function clearAllDrawings()
+        for _, types in pairs(drawingPool) do
+            for _, obj in pairs(types) do
+                pcall(function() obj.Visible = false end)
+            end
+        end
     end
 
-    local function hum(plr)
-        local c = char(plr)
-        return c and c:FindFirstChildOfClass("Humanoid")
-    end
-
-    local function root(plr)
-        local c = char(plr)
-        return c and c:FindFirstChild("HumanoidRootPart")
-    end
-
-    local function isAlive(plr)
-        local h = hum(plr)
-        return h and h.Health > 0
+    local function worldToScreen(position)
+        local cam = workspace.CurrentCamera
+        if not cam then return nil, false end
+        local vec, onScreen = cam:WorldToViewportPoint(position)
+        if onScreen then return Vector2.new(vec.X, vec.Y), true end
+        return nil, false
     end
 
     local function isEnemy(plr)
-        if not plr or plr == LocalPlayer then return false end
-        if state.friendWhitelist[plr.Name] or state.friendWhitelist[plr.DisplayName] then
-            return false
-        end
-        if not state.teamCheck then return true end
-        if LocalPlayer.Team ~= nil and plr.Team ~= nil then
-            return LocalPlayer.Team ~= plr.Team
-        end
-        if LocalPlayer.TeamColor ~= nil and plr.TeamColor ~= nil then
-            return LocalPlayer.TeamColor ~= plr.TeamColor
-        end
-        local attrKeys = {
-            "Team", "Faction", "Side", "Camp", "Group", "Squad", "Role",
-            "Clan", "Alliance", "Guild", "FactionName", "Affiliation", "Party",
-            "Color", "Index", "Allegiance", "Division", "Squadron"
-        }
-        for _, key in ipairs(attrKeys) do
-            local mine = LocalPlayer:GetAttribute(key)
-            local theirs = plr:GetAttribute(key)
-            if mine ~= nil and theirs ~= nil and tostring(mine) ~= "" and tostring(theirs) ~= "" then
-                return tostring(mine) ~= tostring(theirs)
+        if not PlayerESP.ShowTeammates then
+            if LocalPlayer.Team and plr.Team then
+                return LocalPlayer.Team ~= plr.Team
             end
+            return true
         end
-        return state.unknownAsEnemy
+        return true
     end
 
-    local function isCharacterVisible(plr)
-        local cam = Workspace.CurrentCamera
-        if not cam then return true end
-        local c = char(plr)
-        if not c then return true end
-        local head = c:FindFirstChild("Head") or c:FindFirstChild("HumanoidRootPart")
-        if not head then return true end
-        local origin = cam.CFrame.Position
-        local dir = head.Position - origin
-        if dir.Magnitude <= 0.1 then return true end
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        local excl = {}
-        local myC = LocalPlayer.Character
-        if myC then table.insert(excl, myC) end
-        table.insert(excl, c)
-        params.FilterDescendantsInstances = excl
-        local ok, hit = pcall(Workspace.Raycast, Workspace, origin, dir, params)
-        if not ok then return true end
-        return not (hit and hit.Instance)
-    end
-
-    local espStore = {}
-    local tagStore = {}
-    local lastHpCache = {}
-    local avatarCache = {}
-
-    local tagNames = {
-        ZPvpNameTag = true,
-        PvpNameTag = true,
-        PvpFlowNameTag = true,
-        PlayerESPNameTag = true,
-    }
-    local highlightNames = {
-        ZPvpTeamHighlight = true,
-        PvpTeamHighlight = true,
-        PlayerESP = true,
-    }
-
-    local function destroyPlayerTags(plr)
-        local c = char(plr)
-        if c then
-            for _, obj in ipairs(c:GetDescendants()) do
-                if tagNames[obj.Name] and obj:IsA("BillboardGui") then
-                    safeDestroy(obj)
-                end
-            end
-        end
-        safeDestroy(tagStore[plr])
-        tagStore[plr] = nil
-        lastHpCache[plr] = nil
-    end
-
-    local function destroyPlayerHighlights(plr)
-        local c = char(plr)
-        if c then
-            for _, obj in ipairs(c:GetDescendants()) do
-                if highlightNames[obj.Name] and obj:IsA("Highlight") then
-                    safeDestroy(obj)
-                end
-            end
-        end
-        safeDestroy(espStore[plr])
-        espStore[plr] = nil
-    end
-
-    local function updateEspFor(plr)
-        local c = char(plr)
-        local h = hum(plr)
-        local enemy = isEnemy(plr)
-        local headPart = c and c:FindFirstChild("Head")
-
-        local shouldEsp = c and h and h.Health > 0 and ((enemy and state.enemyEsp) or ((not enemy) and state.friendEsp))
-        local shouldNameTag = state.nameTags and headPart and h and h.Health > 0 and enemy
-
-        if not shouldEsp and not shouldNameTag then
-            destroyPlayerHighlights(plr)
-            destroyPlayerTags(plr)
+    local function drawBox(plr)
+        local box = getOrCreateDrawing(plr, "Box", "Square")
+        local char = plr.Character
+        if not char or not PlayerESP.Box or not PlayerESP.Enabled or not isEnemy(plr) then
+            box.Visible = false
             return
         end
-
-        local visible = true
-        if shouldEsp then
-            visible = isCharacterVisible(plr)
-        end
-
-        local espColor, outlineColor
-        if enemy then
-            espColor = visible and Color3.fromRGB(52, 152, 255) or Color3.fromRGB(255, 45, 72)
-            outlineColor = visible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 160, 160)
+        local head = char:FindFirstChild("Head")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not head or not root then box.Visible = false return end
+        local headPos, headOn = worldToScreen(head.Position + Vector3.new(0, 0.5, 0))
+        local rootPos, rootOn = worldToScreen(root.Position - Vector3.new(0, 3, 0))
+        if headOn and rootOn then
+            local height = math.abs(rootPos.Y - headPos.Y)
+            local width = height * 0.6
+            box.Size = Vector2.new(width, height)
+            box.Position = Vector2.new((headPos.X + rootPos.X) / 2 - width / 2, math.min(headPos.Y, rootPos.Y))
+            box.Thickness = 1.5
+            box.Color = Color3.fromRGB(255, 0, 0)
+            box.Filled = false
+            box.Visible = true
         else
-            espColor = visible and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(39, 174, 96)
-            outlineColor = visible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 255, 200)
+            box.Visible = false
         end
+    end
 
-        if shouldEsp then
-            if not espStore[plr] or espStore[plr].Parent ~= c then
-                destroyPlayerHighlights(plr)
-                local hi = Instance.new("Highlight")
-                hi.Name = "ZPvpTeamHighlight"
-                hi.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                hi.FillTransparency = enemy and 0.62 or 0.50
-                hi.OutlineTransparency = 0
-                hi.Parent = c
-                espStore[plr] = hi
-            end
-            espStore[plr].FillColor = espColor
-            espStore[plr].OutlineColor = outlineColor
-        else
-            destroyPlayerHighlights(plr)
-        end
-
-        if shouldNameTag then
-            if not tagStore[plr] or tagStore[plr].Parent ~= headPart then
-                destroyPlayerTags(plr)
-
-                local bill = Instance.new("BillboardGui")
-                bill.Name = "ZPvpNameTag"
-                bill.Adornee = headPart
-                bill.AlwaysOnTop = true
-                bill.StudsOffset = Vector3.new(0, 3.2, 0)
-                bill.Size = UDim2.fromOffset(150, 56)
-                bill.Parent = headPart
-
-                local tag = Instance.new("Frame")
-                tag.Name = "Tag"
-                tag.Size = UDim2.fromScale(1, 1)
-                tag.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-                tag.BackgroundTransparency = 0.35
-                tag.BorderSizePixel = 0
-                tag.Parent = bill
-                Instance.new("UICorner", tag).CornerRadius = UDim.new(0, 9)
-
-                local glassSheen = Instance.new("UIGradient")
-                glassSheen.Name = "GlassSheen"
-                glassSheen.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255), 0.8),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255), 1),
-                })
-                glassSheen.Parent = tag
-
-                local stroke = Instance.new("UIStroke")
-                stroke.Name = "Stroke"
-                stroke.Color = Color3.fromRGB(255, 255, 255)
-                stroke.Transparency = 0.35
-                stroke.Thickness = 1
-                stroke.Parent = tag
-
-                local avatar = Instance.new("ImageLabel")
-                avatar.Name = "Avatar"
-                avatar.Position = UDim2.fromOffset(5, 5)
-                avatar.Size = UDim2.fromOffset(20, 20)
-                avatar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                avatar.BackgroundTransparency = 0.8
-                avatar.BorderSizePixel = 0
-                avatar.ScaleType = Enum.ScaleType.Fit
-                avatar.Parent = tag
-                Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
-                local avatarStroke = Instance.new("UIStroke")
-                avatarStroke.Color = Color3.fromRGB(255, 255, 255)
-                avatarStroke.Transparency = 0.4
-                avatarStroke.Thickness = 1
-                avatarStroke.Parent = avatar
-
-                local function applyAvatar(img)
-                    if avatar and avatar.Parent and type(img) == "string" and img ~= "" then
-                        avatar.Image = img
+    local function drawSkeleton(plr)
+        local char = plr.Character
+        if not char or not PlayerESP.Skeleton or not PlayerESP.Enabled or not isEnemy(plr) then
+            local pool = drawingPool[plr]
+            if pool then
+                for key, drawing in pairs(pool) do
+                    if type(key) == "string" and key:sub(1, 8) == "Skeleton" then
+                        drawing.Visible = false
                     end
                 end
-                local cachedUrl = avatarCache[plr]
-                if type(cachedUrl) == "string" and cachedUrl ~= "" then
-                    applyAvatar(cachedUrl)
+            end
+            return
+        end
+        local parts = {
+            {"Head", "UpperTorso"},
+            {"UpperTorso", "LeftUpperArm"},
+            {"LeftUpperArm", "LeftLowerArm"},
+            {"LeftLowerArm", "LeftHand"},
+            {"UpperTorso", "RightUpperArm"},
+            {"RightUpperArm", "RightLowerArm"},
+            {"RightLowerArm", "RightHand"},
+            {"UpperTorso", "LeftUpperLeg"},
+            {"LeftUpperLeg", "LeftLowerLeg"},
+            {"LeftLowerLeg", "LeftFoot"},
+            {"UpperTorso", "RightUpperLeg"},
+            {"RightUpperLeg", "RightLowerLeg"},
+            {"RightLowerLeg", "RightFoot"},
+        }
+        for i, pair in ipairs(parts) do
+            local part1 = char:FindFirstChild(pair[1])
+            local part2 = char:FindFirstChild(pair[2])
+            local line = getOrCreateDrawing(plr, "Skeleton" .. i, "Line")
+            if part1 and part2 then
+                local p1, on1 = worldToScreen(part1.Position)
+                local p2, on2 = worldToScreen(part2.Position)
+                if on1 and on2 then
+                    line.From = p1
+                    line.To = p2
+                    line.Thickness = 1
+                    line.Color = Color3.fromRGB(0, 255, 0)
+                    line.Visible = true
                 else
-                    task.spawn(function()
-                        local url = ""
-                        for _ = 1, 5 do
-                            local ok, got = pcall(function()
-                                return game:GetService("Thumbnails"):GetPlayerThumbnail(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
-                            end)
-                            if ok and type(got) == "string" and got ~= "" then
-                                url = got
-                                break
-                            end
-                            task.wait(1)
-                        end
-                        if url == "" then
-                            url = "rbxthumb://type=AvatarHeadShot&id=" .. plr.UserId .. "&w=150&h=150"
-                        end
-                        avatarCache[plr] = url
-                        applyAvatar(url)
-                    end)
+                    line.Visible = false
                 end
-
-                local name = Instance.new("TextLabel")
-                name.Name = "Name"
-                name.Position = UDim2.fromOffset(30, 6)
-                name.Size = UDim2.new(1, -36, 0, 12)
-                name.BackgroundTransparency = 1
-                name.BorderSizePixel = 0
-                name.Font = Enum.Font.GothamBold
-                name.TextSize = 10
-                name.TextColor3 = Color3.fromRGB(255, 255, 255)
-                name.TextStrokeTransparency = 0.5
-                name.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                name.TextXAlignment = Enum.TextXAlignment.Left
-                name.Parent = tag
-
-                local barBg = Instance.new("Frame")
-                barBg.Name = "BarBg"
-                barBg.Position = UDim2.fromOffset(6, 33)
-                barBg.Size = UDim2.new(1, -12, 0, 2)
-                barBg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                barBg.BackgroundTransparency = 0.75
-                barBg.BorderSizePixel = 0
-                barBg.Parent = tag
-                Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
-
-                local barFill = Instance.new("Frame")
-                barFill.Name = "BarFill"
-                barFill.Size = UDim2.fromScale(1, 1)
-                barFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                barFill.BorderSizePixel = 0
-                barFill.Parent = barBg
-                Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
-
-                local hp = Instance.new("TextLabel")
-                hp.Name = "Hp"
-                hp.Position = UDim2.fromOffset(0, 38)
-                hp.Size = UDim2.new(1, 0, 0, 10)
-                hp.BackgroundTransparency = 1
-                hp.BorderSizePixel = 0
-                hp.Font = Enum.Font.GothamBold
-                hp.TextSize = 8
-                hp.TextColor3 = Color3.fromRGB(215, 215, 215)
-                hp.TextStrokeTransparency = 0.6
-                hp.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                hp.TextXAlignment = Enum.TextXAlignment.Center
-                hp.Parent = tag
-
-                tagStore[plr] = bill
-
-                local currentHP = math.floor(h.Health)
-                local maxHp = h.MaxHealth > 0 and h.MaxHealth or 100
-                name.Text = plr.Name
-                hp.Text = currentHP .. " / " .. math.floor(maxHp)
-                local ratio = math.clamp(currentHP / maxHp, 0, 1)
-                barFill.Size = UDim2.fromScale(ratio, 1)
-                lastHpCache[plr] = currentHP
             else
-                local tag = tagStore[plr]:FindFirstChild("Tag")
-                if tag then
-                    local currentHP = math.floor(h.Health)
-                    if lastHpCache[plr] ~= currentHP then
-                        local name = tag:FindFirstChild("Name")
-                        local hp = tag:FindFirstChild("Hp")
-                        local barBg = tag:FindFirstChild("BarBg")
-                        local barFill = barBg and barBg:FindFirstChild("BarFill")
-                        local maxHp = h.MaxHealth > 0 and h.MaxHealth or 100
-                        if name then name.Text = plr.Name end
-                        if hp then hp.Text = currentHP .. " / " .. math.floor(maxHp) end
-                        if barFill then
-                            local ratio = math.clamp(currentHP / maxHp, 0, 1)
-                            barFill.Size = UDim2.fromScale(ratio, 1)
-                        end
-                        lastHpCache[plr] = currentHP
-                    end
-                end
+                line.Visible = false
+            end
+        end
+    end
+
+    local function drawHealth(plr)
+        local healthBar = getOrCreateDrawing(plr, "HealthBar", "Line")
+        local char = plr.Character
+        if not char or not PlayerESP.Health or not PlayerESP.Enabled or not isEnemy(plr) then
+            healthBar.Visible = false
+            return
+        end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local head = char:FindFirstChild("Head")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not head or not root then healthBar.Visible = false return end
+        local headPos, headOn = worldToScreen(head.Position + Vector3.new(0, 0.5, 0))
+        local rootPos, rootOn = worldToScreen(root.Position - Vector3.new(0, 3, 0))
+        if headOn and rootOn then
+            local height = math.abs(rootPos.Y - headPos.Y)
+            local barX = headPos.X - 10
+            local barY = math.min(headPos.Y, rootPos.Y)
+            healthBar.From = Vector2.new(barX, barY)
+            healthBar.To = Vector2.new(barX, barY + height)
+            healthBar.Thickness = 2
+            healthBar.Color = Color3.new(0, 1, 0)
+            healthBar.Visible = true
+        else
+            healthBar.Visible = false
+        end
+    end
+
+    local function drawName(plr)
+        local nameText = getOrCreateDrawing(plr, "Name", "Text")
+        local char = plr.Character
+        if not char or not PlayerESP.Name or not PlayerESP.Enabled or not isEnemy(plr) then
+            nameText.Visible = false
+            return
+        end
+        local head = char:FindFirstChild("Head")
+        if not head then nameText.Visible = false return end
+        local headPos, onScreen = worldToScreen(head.Position + Vector3.new(0, 0.5, 0))
+        if onScreen then
+            nameText.Text = plr.Name
+            nameText.Position = headPos + Vector2.new(0, -15)
+            nameText.Color = Color3.fromRGB(255, 255, 255)
+            nameText.Size = 12
+            nameText.Center = true
+            nameText.Outline = true
+            nameText.Visible = true
+        else
+            nameText.Visible = false
+        end
+    end
+
+    local function drawTracers(plr)
+        local tracer = getOrCreateDrawing(plr, "Tracer", "Line")
+        local char = plr.Character
+        if not char or not PlayerESP.Tracers or not PlayerESP.Enabled or not isEnemy(plr) then
+            tracer.Visible = false
+            return
+        end
+        local head = char:FindFirstChild("Head")
+        if not head then tracer.Visible = false return end
+        local headPos, onScreen = worldToScreen(head.Position)
+        local cam = workspace.CurrentCamera
+        if not cam then tracer.Visible = false return end
+        local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+        if onScreen then
+            tracer.From = center
+            tracer.To = headPos
+            tracer.Thickness = 1
+            tracer.Color = Color3.fromRGB(255, 255, 255)
+            tracer.Visible = true
+        else
+            tracer.Visible = false
+        end
+    end
+
+    local function drawDistance(plr)
+        local distText = getOrCreateDrawing(plr, "Distance", "Text")
+        local char = plr.Character
+        if not char or not PlayerESP.Distance or not PlayerESP.Enabled or not isEnemy(plr) then
+            distText.Visible = false
+            return
+        end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root or not myRoot then distText.Visible = false return end
+        local distance = (root.Position - myRoot.Position).Magnitude
+        if distance <= PlayerESP.MaxDistance then
+            local rootPos, onScreen = worldToScreen(root.Position)
+            if onScreen then
+                distText.Text = string.format("%.0f m", distance)
+                distText.Position = rootPos + Vector2.new(0, -5)
+                distText.Color = Color3.fromRGB(255, 255, 255)
+                distText.Size = 12
+                distText.Center = true
+                distText.Outline = true
+                distText.Visible = true
+            else
+                distText.Visible = false
             end
         else
-            destroyPlayerTags(plr)
+            distText.Visible = false
         end
     end
 
-    local function clearVisuals()
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                destroyPlayerTags(plr)
-                destroyPlayerHighlights(plr)
+    local function updateChams()
+        if not PlayerESP.Chams then
+            for plr, hl in pairs(chams) do
+                if hl then hl:Destroy() end
+                chams[plr] = nil
             end
+            return
         end
-        table.clear(lastHpCache)
-    end
-
-    local espUpdateTimer = 0
-    local function onRenderStep(deltaTime)
-        local needUpdate = state.enemyEsp or state.friendEsp or state.nameTags
-        if needUpdate then
-            espUpdateTimer = espUpdateTimer + deltaTime
-            if espUpdateTimer >= 0.2 then
-                espUpdateTimer = 0
-                for _, plr in ipairs(Players:GetPlayers()) do
-                    if plr ~= LocalPlayer then
-                        pcall(updateEspFor, plr)
-                    end
+        for _, plr in ipairs(PlayerService:GetPlayers()) do
+            if plr ~= LocalPlayer and isEnemy(plr) and plr.Character then
+                if not chams[plr] then
+                    local hl = Instance.new("Highlight")
+                    hl.FillColor = Color3.new(1, 0, 0)
+                    hl.OutlineColor = Color3.new(1, 1, 1)
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0
+                    hl.Enabled = true
+                    hl.Parent = plr.Character
+                    chams[plr] = hl
+                end
+            else
+                if chams[plr] then
+                    chams[plr]:Destroy()
+                    chams[plr] = nil
                 end
             end
-        else
-            espUpdateTimer = espUpdateTimer + deltaTime
-            if espUpdateTimer >= 0.5 then
-                espUpdateTimer = 0
-                for _, plr in ipairs(Players:GetPlayers()) do
-                    if plr ~= LocalPlayer then
-                        destroyPlayerHighlights(plr)
-                        destroyPlayerTags(plr)
-                    end
-                end
-                table.clear(lastHpCache)
-            end
         end
     end
 
-    RunService:BindToRenderStep("DrawPlayerEspStep", Enum.RenderPriority.Camera.Value + 1, onRenderStep)
-
-    Players.PlayerAdded:Connect(function(plr) end)
-    Players.PlayerRemoving:Connect(function(plr)
-        destroyPlayerTags(plr)
-        destroyPlayerHighlights(plr)
-        lastHpCache[plr] = nil
+    local updateTimer = 0
+    RunService.RenderStepped:Connect(function(dt)
+        if not PlayerESP.Enabled then
+            clearAllDrawings()
+            return
+        end
+        updateTimer = updateTimer + dt
+        if updateTimer >= 0.05 then
+            updateTimer = 0
+            for _, plr in ipairs(PlayerService:GetPlayers()) do
+                if plr ~= LocalPlayer and isEnemy(plr) then
+                    pcall(drawBox, plr)
+                    pcall(drawSkeleton, plr)
+                    pcall(drawHealth, plr)
+                    pcall(drawName, plr)
+                    pcall(drawTracers, plr)
+                    pcall(drawDistance, plr)
+                end
+            end
+            pcall(updateChams)
+        end
     end)
-    LocalPlayer.CharacterAdded:Connect(function() end)
 
-    getgenv().DrawPlayer = {
-        setEnemyEsp = function(v) state.enemyEsp = v end,
-        setFriendEsp = function(v) state.friendEsp = v end,
-        setTeamCheck = function(v) state.teamCheck = v end,
-        setUnknownAsEnemy = function(v) state.unknownAsEnemy = v end,
-        setNameTags = function(v)
-            state.nameTags = v
-            if not v then
-                for _, plr in ipairs(Players:GetPlayers()) do
-                    if plr ~= LocalPlayer then destroyPlayerTags(plr) end
-                end
-                table.clear(lastHpCache)
+    PlayerService.PlayerRemoving:Connect(function(plr)
+        if drawingPool[plr] then
+            for _, obj in pairs(drawingPool[plr]) do
+                pcall(function() obj:Remove() end)
             end
-        end,
-        addFriendWhitelist = function(name)
-            state.friendWhitelist[name] = true
-        end,
-        clearWhitelist = function()
-            table.clear(state.friendWhitelist)
-        end,
-        getState = function() return state end,
-    }
+            drawingPool[plr] = nil
+        end
+        if chams[plr] then chams[plr]:Destroy() chams[plr] = nil end
+    end)
 end
 
 -- ========================= UI 构建 =========================
@@ -1602,8 +1485,8 @@ end
 local IntroGroup = Tabs.Intro:AddLeftGroupbox("关于脚本")
 IntroGroup:AddParagraph({
     Title = "YEX Hub 兵工厂",
-    Desc = [[功能：Hitbox扩大、自瞄（FOV+锁头）、自动开枪、自动传送击杀、飞行（手机端可能有bug）、速度调节、穿墙、物品传送、视觉增强（ESP/高亮/身份牌只显示敌人）、武器修改（无限弹药/快速射击等）、皮肤美化等。
-按 RightShift 开关UI。
+    Desc = [[欢迎你的游玩😊😊
+电脑按 右Shift 开关UI如对脚本有问题可以联系作者
 作者：y（QQ：2071274105）]]
 })
 
@@ -1663,7 +1546,7 @@ Options.LockTarget:OnChanged(function(v)
 end)
 
 local AimGroup = Tabs.Main:AddRightGroupbox("FOV自瞄")
-AimGroup:AddToggle("AimEnable", { Text = "开启 FOV 自瞄", Default = AimState.enabled })
+AimGroup:AddToggle("AimEnable", { Text = "开启自瞄", Default = AimState.enabled })
 Toggles.AimEnable:OnChanged(function(state)
     task.spawn(function() Aim_setEnabled(state) end)
 end)
@@ -2295,30 +2178,16 @@ Toggles.FPSBoost:OnChanged(function(state)
 end)
 
 local PlayerEspGroup = Tabs.Visual:AddRightGroupbox("玩家绘制")
-PlayerEspGroup:AddToggle("DrawEnemyEsp", { Text = "启用敌人ESP (高亮)", Default = false })
-Toggles.DrawEnemyEsp:OnChanged(function(state)
-    task.spawn(function() getgenv().DrawPlayer.setEnemyEsp(state) end)
-end)
-
-PlayerEspGroup:AddToggle("DrawFriendEsp", { Text = "启用队友ESP (高亮)", Default = false })
-Toggles.DrawFriendEsp:OnChanged(function(state)
-    task.spawn(function() getgenv().DrawPlayer.setFriendEsp(state) end)
-end)
-
-PlayerEspGroup:AddToggle("DrawNameTags", { Text = "显示身份牌 (只显示敌人)", Default = false })
-Toggles.DrawNameTags:OnChanged(function(state)
-    task.spawn(function() getgenv().DrawPlayer.setNameTags(state) end)
-end)
-
-PlayerEspGroup:AddToggle("DrawTeamCheck", { Text = "阵营检测", Default = true })
-Toggles.DrawTeamCheck:OnChanged(function(state)
-    task.spawn(function() getgenv().DrawPlayer.setTeamCheck(state) end)
-end)
-
-PlayerEspGroup:AddToggle("DrawUnknownEnemy", { Text = "未知阵营视为敌人", Default = false })
-Toggles.DrawUnknownEnemy:OnChanged(function(state)
-    task.spawn(function() getgenv().DrawPlayer.setUnknownAsEnemy(state) end)
-end)
+PlayerEspGroup:AddToggle("ESPEnabled", { Text = "启用 ESP", Default = false, Callback = function(v) PlayerESP.Enabled = v end })
+PlayerEspGroup:AddToggle("ESPShowTeammates", { Text = "显示队友", Default = false, Callback = function(v) PlayerESP.ShowTeammates = v end })
+PlayerEspGroup:AddToggle("ESPBox", { Text = "方框", Default = false, Callback = function(v) PlayerESP.Box = v end })
+PlayerEspGroup:AddToggle("ESPSkeleton", { Text = "骨骼", Default = false, Callback = function(v) PlayerESP.Skeleton = v end })
+PlayerEspGroup:AddToggle("ESPChams", { Text = "高亮 (Chams)", Default = false, Callback = function(v) PlayerESP.Chams = v end })
+PlayerEspGroup:AddToggle("ESPHealth", { Text = "血条", Default = false, Callback = function(v) PlayerESP.Health = v end })
+PlayerEspGroup:AddToggle("ESPName", { Text = "玩家名称", Default = false, Callback = function(v) PlayerESP.Name = v end })
+PlayerEspGroup:AddToggle("ESPTracers", { Text = "准星连线", Default = false, Callback = function(v) PlayerESP.Tracers = v end })
+PlayerEspGroup:AddToggle("ESPDistance", { Text = "距离", Default = false, Callback = function(v) PlayerESP.Distance = v end })
+PlayerEspGroup:AddSlider("ESPMaxDistance", { Text = "最大距离", Min = 50, Max = 500, Default = 150, Rounding = 0, Callback = function(v) PlayerESP.MaxDistance = v end })
 
 local SkinGroup = Tabs.Visual:AddRightGroupbox("皮肤")
 SkinGroup:AddDropdown("ArmMaterial", { Text = "手臂材质", Values = {"Plastic","ForceField","Wood","Grass"}, Default = ArmMaterial })

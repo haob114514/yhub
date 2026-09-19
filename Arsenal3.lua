@@ -14,9 +14,8 @@ local PlayerService = game:GetService("Players")
 local LocalPlayer = PlayerService.LocalPlayer
 
 local Window = WindUI:CreateWindow({
-    Title = "YEX Hub | BY:y",
+    Title = "Nexus",
     Folder = "arsenal3_pvp26_ui",
-    Icon = "https://i.postimg.cc/W4KVmsVP/Chat-GPT-Image-2026nian9yue5ri-11-57-15.png",
     NewElements = true,
     HideSearchBar = false,
     Background = "https://i.postimg.cc/kMkh9BJH/zhe-feng-bi-zhi-ren-wu-te-xie-dong-man-shao-nu.jpg",
@@ -27,7 +26,7 @@ local Window = WindUI:CreateWindow({
     SideBarWidth = 200,
     ScrollBarEnabled = true,
     OpenButton = {
-        Title = "打开 YEX Hub",
+        Title = "打开 Nexus",
         CornerRadius = UDim.new(1, 0),
         StrokeThickness = 3,
         Enabled = true,
@@ -1484,16 +1483,16 @@ end
 -- 新增简介标签页内容（放在第一位）
 local IntroGroup = Tabs.Intro:AddLeftGroupbox("关于脚本")
 IntroGroup:AddParagraph({
-    Title = "YEX Hub 兵工厂",
-    Desc = [[欢迎你的游玩😊😊
-电脑按 右Shift 开关UI如对脚本有问题可以联系作者
-作者：y（QQ：2071274105）]]
+    Title = "Nexus 兵工厂",
+    Desc = [[欢迎你的游玩😊😊😊😊
+电脑端按 RightShift 开关UI。
+官方QQ群：1098748906]]
 })
 
 -- 战斗 Tab
 local MainGroup = Tabs.Main:AddLeftGroupbox("战斗基础")
 
-MainGroup:AddToggle("HitboxToggle", { Text = "开启 Hitbox 扩大", Default = BooleanFlag }):AddKeyPicker("HitboxKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
+MainGroup:AddToggle("HitboxToggle", { Text = "开启 碰撞箱 扩大", Default = BooleanFlag }):AddKeyPicker("HitboxKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.HitboxToggle:OnChanged(function(state)
     task.spawn(function()
         BooleanFlag = state
@@ -1506,7 +1505,7 @@ Toggles.HitboxToggle:OnChanged(function(state)
     end)
 end)
 
-MainGroup:AddSlider("HitboxSize", { Text = "Hitbox 大小", Min = 1, Max = 30, Default = IntegerValue, Rounding = 1 })
+MainGroup:AddSlider("HitboxSize", { Text = "碰撞箱 大小", Min = 1, Max = 30, Default = IntegerValue, Rounding = 1 })
 Options.HitboxSize:OnChanged(function(v)
     task.spawn(function()
         IntegerValue = v
@@ -1514,7 +1513,7 @@ Options.HitboxSize:OnChanged(function(v)
     end)
 end)
 
-MainGroup:AddSlider("HitboxAlpha", { Text = "Hitbox 透明度 (0=透明，10=可见)", Min = 0, Max = 10, Default = SmallIntegerValue, Rounding = 1 })
+MainGroup:AddSlider("HitboxAlpha", { Text = "碰撞箱 透明度 (0=透明，10=可见)", Min = 0, Max = 10, Default = SmallIntegerValue, Rounding = 1 })
 Options.HitboxAlpha:OnChanged(function(v)
     task.spawn(function()
         SmallIntegerValue = v
@@ -1545,18 +1544,18 @@ Options.LockTarget:OnChanged(function(v)
     task.spawn(function() LockOnTarget = v; EnemyCharacter = nil end)
 end)
 
-local AimGroup = Tabs.Main:AddRightGroupbox("FOV自瞄")
+local AimGroup = Tabs.Main:AddRightGroupbox("自瞄")
 AimGroup:AddToggle("AimEnable", { Text = "开启自瞄", Default = AimState.enabled })
 Toggles.AimEnable:OnChanged(function(state)
     task.spawn(function() Aim_setEnabled(state) end)
 end)
 
-AimGroup:AddToggle("AimWall", { Text = "有墙壁也允许自瞄", Default = AimState.wallAim })
+AimGroup:AddToggle("AimWall", { Text = "关闭墙壁检测", Default = AimState.wallAim })
 Toggles.AimWall:OnChanged(function(state)
     task.spawn(function() AimState.wallAim = state end)
 end)
 
-AimGroup:AddToggle("AimDead", { Text = "死亡目标也允许自瞄", Default = AimState.aimDead })
+AimGroup:AddToggle("AimDead", { Text = "关闭死亡检测", Default = AimState.aimDead })
 Toggles.AimDead:OnChanged(function(state)
     task.spawn(function() AimState.aimDead = state end)
 end)
@@ -1566,7 +1565,7 @@ Toggles.AimOnlySelected:OnChanged(function(state)
     task.spawn(function() AimState.onlySelected = state end)
 end)
 
-AimGroup:AddToggle("AimEnemyOnly", { Text = "只瞄敌人", Default = AimState.enemyOnly })
+AimGroup:AddToggle("AimEnemyOnly", { Text = "队伍检测", Default = AimState.enemyOnly })
 Toggles.AimEnemyOnly:OnChanged(function(state)
     task.spawn(function() AimState.enemyOnly = state end)
 end)
@@ -1584,7 +1583,7 @@ Options.AimMaxDist:OnChanged(function(v)
     task.spawn(function() AimState.maxDistance = v end)
 end)
 
-AimGroup:AddSlider("AimSmooth", { Text = "平滑度 (3~75)", Min = 3, Max = 75, Default = math.floor(AimState.smooth * 100), Rounding = 1 })
+AimGroup:AddSlider("AimSmooth", { Text = "平滑度 (3~75越大瞄准速度越快)", Min = 3, Max = 75, Default = math.floor(AimState.smooth * 100), Rounding = 1 })
 Options.AimSmooth:OnChanged(function(v)
     task.spawn(function() AimState.smooth = math.clamp(v / 100, 0.03, 0.75) end)
 end)
@@ -1786,7 +1785,7 @@ end)
 
 -- 移动 Tab
 local MoveGroup = Tabs.Move:AddLeftGroupbox("移动控制")
-MoveGroup:AddToggle("FlyToggle", { Text = "飞行", Default = false }):AddKeyPicker("FlyKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
+MoveGroup:AddToggle("FlyToggle", { Text = "飞行（手机端有bug）", Default = false }):AddKeyPicker("FlyKey", { Default = "RightAlt", SyncToggleState = true, Mode = "Toggle" })
 Toggles.FlyToggle:OnChanged(function(state)
     task.spawn(function()
         if state then
@@ -2436,4 +2435,4 @@ uiGroup:AddButton("重新打开 UI", function()
     pcall(function() Window:Toggle() end)
 end)
 
-Library:Notify("YEX Hub", "功能已加载，请查看各标签页", 4)
+Library:Notify("Nexus", "功能已加载，请查看各标签页", 4)

@@ -89,7 +89,7 @@ do
 		textLabel.TextSize = 18
 		textLabel.TextXAlignment = Enum.TextXAlignment.Left
 		textLabel.TextColor3 = color
-		textLabel.Text = "执行器警告"
+		textLabel.Text = "注入器警告"
 		textLabel.ZIndex = 3
 		textLabel.Parent = frame2
 		local textLabel2 = Instance.new("TextLabel")
@@ -115,9 +115,9 @@ do
 		textLabel3.TextYAlignment = Enum.TextYAlignment.Top
 		textLabel3.TextColor3 = color2
 
-		textLabel3.Text = "检测到你正在使用 " .. text .. [[。该执行器可能不支持本脚本的全部功能，可能会导致更多的 Bug 或问题。
+		textLabel3.Text = "检测到你正在使用 " .. text .. [[。该注入器可能不支持本脚本的全部功能
 
-请下次使用更好的执行器。]]
+请使用更好的注入器]]
 
 		textLabel3.ZIndex = 3
 		textLabel3.Parent = frame2
@@ -7350,7 +7350,7 @@ do
 		if not getconnections then
 			obj2:Notify({
 				Title = "静默自瞄",
-				Content = "你的执行器没有 getconnections —— 普通射击也会触发。",
+				Content = "你的注入器没有 getconnections —— 普通射击也会触发",
 				Duration = 4,
 				Icon = "x",
 			})
@@ -13761,6 +13761,182 @@ tbl43.player:Slider({
 	end,
 })
 
+tbl43.player:Section({ Title = "人物旋转" })
+
+list2.spin = {
+	on = false,
+	speed = 180,
+	conn = nil,
+	angle = 0,
+	gyro = nil,
+	autoRotateWas = nil,
+}
+
+list2.spin.stop = function()
+	list2.spin.on = false
+
+	if list2.spin.conn then
+		pcall(function()
+			list2.spin.conn:Disconnect()
+		end)
+		list2.spin.conn = nil
+	end
+
+	if list2.spin.gyro then
+		pcall(function()
+			list2.spin.gyro:Destroy()
+		end)
+		list2.spin.gyro = nil
+	end
+
+	local character = localPlayer.Character
+	local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+	if humanoidRootPart then
+		local leftover = humanoidRootPart:FindFirstChild("FVLSpinGyro")
+
+		if leftover then
+			pcall(function()
+				leftover:Destroy()
+			end)
+		end
+	end
+
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid and list2.spin.autoRotateWas ~= nil then
+		pcall(function()
+			humanoid.AutoRotate = list2.spin.autoRotateWas
+		end)
+	end
+
+	list2.spin.autoRotateWas = nil
+end
+
+list2.spin.ensureGyro = function(character, humanoidRootPart)
+	if list2.spin.gyro and list2.spin.gyro.Parent == humanoidRootPart then
+		return list2.spin.gyro
+	end
+
+	if list2.spin.gyro then
+		pcall(function()
+			list2.spin.gyro:Destroy()
+		end)
+		list2.spin.gyro = nil
+	end
+
+	local leftover = humanoidRootPart:FindFirstChild("FVLSpinGyro")
+
+	if leftover then
+		pcall(function()
+			leftover:Destroy()
+		end)
+	end
+
+	local bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.Name = "FVLSpinGyro"
+	bodyGyro.P = 40000
+	bodyGyro.D = 1000
+	bodyGyro.MaxTorque = Vector3.new(0, 1e9, 0)
+	bodyGyro.CFrame = humanoidRootPart.CFrame
+	bodyGyro.Parent = humanoidRootPart
+
+	list2.spin.gyro = bodyGyro
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid and list2.spin.autoRotateWas == nil then
+		list2.spin.autoRotateWas = humanoid.AutoRotate
+
+		pcall(function()
+			humanoid.AutoRotate = false
+		end)
+	end
+
+	return bodyGyro
+end
+
+list2.spin.start = function()
+	if list2.spin.on then
+		return
+	end
+
+	list2.spin.on = true
+
+	list2.spin.conn = RunService.RenderStepped:Connect(function(deltaTime)
+		if not list2.spin.on then
+			return
+		end
+
+		local character = localPlayer.Character
+		local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+		if not humanoidRootPart then
+			if list2.spin.gyro then
+				pcall(function()
+					list2.spin.gyro:Destroy()
+				end)
+				list2.spin.gyro = nil
+			end
+			return
+		end
+
+		local bodyGyro = list2.spin.ensureGyro(character, humanoidRootPart)
+
+		if not bodyGyro then
+			return
+		end
+
+		list2.spin.angle = (list2.spin.angle + math.rad(list2.spin.speed) * deltaTime) % (math.pi * 2)
+		bodyGyro.CFrame = CFrame.new(humanoidRootPart.Position) * CFrame.Angles(0, list2.spin.angle, 0)
+	end)
+end
+
+list2.el.spin = tbl43.player:Toggle({
+	Title = "人物旋转",
+	Flag = "Toggle_Character_Spin",
+	Desc = "让你的角色旋转",
+	Type = "Toggle",
+	Value = false,
+	Callback = function(value)
+		if value then
+			list2.spin.start()
+
+			obj2:Notify({
+				Title = "人物旋转已开启",
+				Content = "你的角色正在旋转！",
+				Duration = 2,
+				Icon = "check",
+			})
+		else
+			list2.spin.stop()
+
+			obj2:Notify({
+				Title = "人物旋转已关闭",
+				Content = "旋转已停止。",
+				Duration = 2,
+				Icon = "power-off",
+			})
+		end
+	end,
+})
+
+tbl43.player:Slider({
+	Title = "旋转速度",
+	Flag = "Slider_Spin_Speed",
+	Desc = "每秒旋转的角度（度/秒）。180 约等于半秒转一圈，720 则每秒转两圈。",
+	Step = 5,
+	Value = { Min = 10, Max = 1440, Default = 180 },
+	Callback = function(value)
+		local numeric = tonumber(value) or (type(value) == "table" and tonumber(value.Value))
+
+		if numeric then
+			list2.spin.speed = numeric
+		end
+	end,
+})
+
+
 tbl43.player:Section({ Title = "测试版" })
 
 tbl43.player:Button({
@@ -14318,16 +14494,20 @@ local function fvlV2Cleanup()
 	flag42 = false
 	flag43 = false
 	flag44 = false
-	func40()
-	func42()
-	func44()
-	func46()
-	func37(16)
-	func38(50)
-	func49()
-	func51()
-	func53()
-	list2.stopShells()
+func40()
+func42()
+func44()
+func46()
+func37(16)
+func38(50)
+func49()
+func51()
+func53()
+list2.stopShells()
+
+if list2.spin then
+	list2.spin.stop()
+end
 	local func201 = ipairs
 	local boxes = list2.BOXES or {}
 

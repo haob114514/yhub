@@ -404,7 +404,7 @@ do
     end
 end
 
-obj3:Tag({ Title = "手机电脑通用", Icon = "smartphone", Color = Color3.fromHex("#ffffff"), Radius = 6 })
+obj3:Tag({ Title = "V1.1", Icon = "smartphone", Color = Color3.fromHex("#ffffff"), Radius = 6 })
 
 task.spawn(function()
 	local tbl3 = { ["手机 & 电脑"] = true, ["Nexus"] = true }
@@ -675,6 +675,61 @@ list2 = {
 	hudFile = "WindUI/FVLV2/hud/autosave.json",
 }
 
+local function buildRangeRing(cfg)
+	local segments  = cfg.segments or 60
+	local color     = cfg.color or Color3.fromRGB(255, 60, 60)
+	local radius    = cfg.radius or 15
+	local trans     = cfg.transparency or 0.3
+	local parent    = cfg.parent or workspace.CurrentCamera
+
+	local model = Instance.new("Model")
+	model.Name = cfg.name or "FVLRangeRing"
+	model.Parent = parent
+
+	local parts = {}
+	for i = 1, segments do
+		local seg = Instance.new("Part")
+		seg.Name = "Seg"
+		seg.Material = Enum.Material.Neon
+		seg.Color = color
+		seg.Transparency = trans
+		seg.Anchored = true
+		seg.CanCollide = false
+		seg.CanTouch = false
+		seg.CanQuery = false
+		seg.CastShadow = false
+		seg.Size = Vector3.new(0.3, 0.3, 1)
+		seg.Parent = model
+		parts[i] = seg
+	end
+
+	local function update(pos, rad)
+		local r = rad or radius
+		local thick = math.max(0.2, r * 0.025)
+		local segLen = (2 * math.pi * r) / segments * 1.25
+		for i = 1, segments do
+			local p = parts[i]
+			local a = (i / segments) * math.pi * 2
+			local center = Vector3.new(
+				pos.X + math.cos(a) * r,
+				pos.Y,
+				pos.Z + math.sin(a) * r
+			)
+			local tangent = Vector3.new(-math.sin(a), 0, math.cos(a))
+			p.Size = Vector3.new(thick, thick, segLen)
+			p.CFrame = CFrame.lookAt(center, center + tangent)
+		end
+	end
+
+	return {
+		model = model,
+		parts = parts,
+		update = update,
+		destroy = function()
+			pcall(function() model:Destroy() end)
+		end,
+	}
+end
 pcall(function()
 	if makefolder and isfolder and not isfolder(list2.hudDir) then
 		makefolder(list2.hudDir)
@@ -1135,7 +1190,8 @@ list2.card = function(flag15)
 		local color9 = Color3.fromRGB(236, 236, 244)
 		local actions = tbl14.actions
 		local flag16 = type(actions) == "table" and #actions > 0
-		local n = flag16 and 194 or 144
+		local bodyH = tonumber(tbl14.bodyHeight) or 42
+local n = 82 + bodyH + (flag16 and 70 or 20)
 		local textButton = Instance.new("TextButton")
 		textButton.Size = UDim2.fromScale(1, 1)
 		textButton.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -1253,7 +1309,7 @@ list2.card = function(flag15)
 		textLabel2.Parent = frame
 		local textLabel3 = Instance.new("TextLabel")
 		textLabel3.Position = UDim2.fromOffset(22, 82)
-		textLabel3.Size = UDim2.new(1, -44, 0, 42)
+		textLabel3.Size = UDim2.new(1, -44, 0, bodyH)
 		textLabel3.BackgroundTransparency = 1
 		textLabel3.Font = Enum.Font.Gotham
 		textLabel3.TextSize = 15
@@ -1299,7 +1355,7 @@ list2.card = function(flag15)
 		if flag16 then
 			local frame4 = Instance.new("Frame")
 			frame4.AnchorPoint = Vector2.new(1, 0)
-			frame4.Position = UDim2.new(1, -22, 0, 136)
+			frame4.Position = UDim2.new(1, -22, 0, 82 + bodyH + 12)
 			frame4.Size = UDim2.new(1, -44, 0, 38)
 			frame4.BackgroundTransparency = 1
 			frame4.ZIndex = 1
@@ -1419,9 +1475,9 @@ list2.farewell = function()
 	list2.saidBye = true
 
 	list2.card({
-		title = "再见！",
+		title = "再见欢迎你再次使用",
 		subtitle = "感谢使用 Nexus",
-		body = "下次见。",
+		body = "天下没有不散的宴席",
 	})
 end
 
@@ -6410,7 +6466,7 @@ do
 	end
 
 	HUDOrder = { "Shoot", "Grab", "Aimbot", "Bomb", "Throw", "WallHop" }
-	HUDOrder2 = { "KillAll", "KillSheriff", "Fly", "Noclip", "Xray" }
+	HUDOrder2 = { "KillAll", "KillSheriff", "KillAura", "Fly", "Noclip", "Xray" }
 	tbl35 = {}
 
 	local function func97(list15, param56)
@@ -6444,18 +6500,19 @@ do
 	end
 
 	HUDIcon = {
-		Shoot = "crosshair",
-		Grab = "hand",
-		Throw = "sword",
-		Bomb = "bomb",
-		Aimbot = "target",
-		WallHop = "climb",
-		KillAll = "badge",
-		Fly = "plane",
-		Noclip = "ghost",
-		KillSheriff = "skull",
-		Xray = "xray",
-	}
+    Shoot = "crosshair",
+    Grab = "hand",
+    Throw = "sword",
+    Bomb = "bomb",
+    Aimbot = "target",
+    WallHop = "climb",
+    KillAll = "badge",
+    KillAura = "skull",
+    Fly = "plane",
+    Noclip = "ghost",
+    KillSheriff = "skull",
+    Xray = "xray",
+}
 
 	HUDIconSize = { Xray = 34, Bomb = 48 }
 	HUDIconArt = { Xray = { 165, 85, 250 }, Bomb = { 8, 24, 170 } }
@@ -6468,6 +6525,7 @@ do
 		Aimbot = Color3.fromHex("#2DD4BF"),
 		WallHop = Color3.fromHex("#A855F7"),
 		KillAll = Color3.fromHex("#DC2626"),
+		KillAura = Color3.fromHex("#FF2E2E"),
 		Fly = Color3.fromHex("#38BDF8"),
 		Noclip = Color3.fromHex("#94A3B8"),
 		KillSheriff = Color3.fromHex("#DC2626"),
@@ -7780,83 +7838,63 @@ do
 			end)
 		end,
 		hideBall = function()
-			if num17.showConn then
-				pcall(function()
-					num17.showConn:Disconnect()
-				end)
+	if num17.showConn then
+		pcall(function() num17.showConn:Disconnect() end)
+	end
+	num17.showConn = nil
+
+	if num17.ring then
+		pcall(function() num17.ring:destroy() end)
+		num17.ring = nil
+	end
+
+	if num17.ball then
+		pcall(function() num17.ball:Destroy() end)
+		num17.ball = nil
+	end
+end,
+showBall = function()
+	num17.hideBall()
+
+	num17.ring = buildRangeRing({
+		name         = "FVLHitboxRing",
+		color        = Color3.fromRGB(255, 90, 90),
+		radius       = num17.radius,
+		transparency = 0.25,
+	})
+
+	num17.showConn = RunService.RenderStepped:Connect(function()
+		local character = localPlayer.Character
+		if not character then return end
+
+		local position = nil
+		for _, item29 in ipairs(CollectionService:GetTagged("ThrowingKnife")) do
+			local handleLink = item29:FindFirstChild("HandleLink")
+			local flag134 = handleLink and handleLink.Value
+			local parent = flag134 and flag134.Parent
+			if parent and parent:IsDescendantOf(character) then
+				position = item29:IsA("BasePart") and item29.Position
+					or (item29:IsA("Model") and item29:GetPivot().Position)
+				if position then break end
 			end
+		end
 
-			num17.showConn = nil
+		if not position then
+			local knife = character:FindFirstChild("Knife")
+			local handle = knife and knife:FindFirstChild("Handle")
+			position = handle and handle.Position
+		end
 
-			if num17.ball then
-				pcall(function()
-					num17.ball:Destroy()
-				end)
-			end
+		if not position then
+			local hrp = character:FindFirstChild("HumanoidRootPart")
+			position = hrp and hrp.Position
+		end
 
-			num17.ball = nil
-		end,
-		showBall = function()
-			num17.hideBall()
-			local part = Instance.new("Part")
-			part.Name = "FVLHitboxSphere"
-			part.Shape = Enum.PartType.Ball
-			part.Anchored = true
-			part.CanCollide = false
-			part.CanTouch = false
-			part.CanQuery = false
-			part.CastShadow = false
-			part.Material = Enum.Material.Neon
-			part.Color = Color3.fromRGB(255, 90, 90)
-			part.Transparency = 0.88
-			part.Size = Vector3.one * num17.radius * 2
-			part.Parent = Workspace.CurrentCamera
-			num17.ball = part
-
-			num17.showConn = RunService.RenderStepped:Connect(function()
-				if not part.Parent then
-					return
-				end
-				local character = localPlayer.Character
-				if not character then
-					return
-				end
-				local position = nil
-
-				for _, item29 in ipairs(CollectionService:GetTagged("ThrowingKnife")) do
-					local handleLink = item29:FindFirstChild("HandleLink")
-					local flag134 = handleLink and handleLink.Value
-					local parent = flag134 and flag134.Parent
-
-					if parent and parent:IsDescendantOf(character) then
-						position = item29:IsA("BasePart") and item29.Position or item29:IsA("Model") and item29:GetPivot().Position
-						if not position then
-							continue
-						end
-					else
-						continue
-					end
-
-					break
-				end
-
-				if not position then
-					position = character:FindFirstChild("Knife")
-					position = position and position:FindFirstChild("Handle")
-					position = position and position.Position
-				end
-
-				if not position then
-					position = character:FindFirstChild("HumanoidRootPart")
-					position = position and position.Position
-				end
-
-				if position then
-					part.Size = Vector3.one * num17.radius * 2
-					part.CFrame = CFrame.new(position)
-				end
-			end)
-		end,
+		if position then
+			num17.ring.update(position, num17.radius)
+		end
+	end)
+end,
 	}
 
 	flag83 = {
@@ -8145,6 +8183,17 @@ tbl43.about:Button({
 		end
 	end,
 })
+tbl43.about:Section({ Title = "更新日志" })
+
+tbl43.about:Paragraph({
+	Title = "V1.1",
+	Desc = "[+] 杀戮光环\n[+] 枪械模型变大\n[+] 刀模型变大\n[+] 人物旋转\n[+] 子弹轨迹",
+})
+
+tbl43.about:Paragraph({
+	Title = "V1.0",
+	Desc = "首个版本",
+})
 -- ===== 关于脚本标签页结束 =====
 tbl43.combat = obj3:Tab({
 	Title = "战斗",
@@ -8308,6 +8357,417 @@ tbl43.visuals:Toggle({
 	end,
 })
 
+-- ===== 子弹轨迹 =====
+tbl43.visuals:Section({ Title = "子弹轨迹" })
+
+list2.bulletTracer = {
+	on = false,
+	color = Color3.fromRGB(255, 220, 100),
+	conn = nil,
+	folder = nil,
+}
+
+list2.bulletTracer.getFolder = function()
+	if list2.bulletTracer.folder and list2.bulletTracer.folder.Parent then
+		return list2.bulletTracer.folder
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "FVLBulletTracers"
+	folder.Parent = workspace
+	list2.bulletTracer.folder = folder
+	return folder
+end
+
+list2.bulletTracer.getMuzzle = function()
+	local character = localPlayer and localPlayer.Character
+	if not character then return nil end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		local att = hrp:FindFirstChild("GunRaycastAttachment")
+		if att and att:IsA("Attachment") then
+			return att.WorldPosition
+		end
+	end
+	local gun = character:FindFirstChild("Gun")
+	local handle = gun and gun:FindFirstChild("Handle")
+	if handle then return handle.Position end
+	local rightHand = character:FindFirstChild("RightHand")
+	if rightHand then return rightHand.Position end
+	return hrp and hrp.Position
+end
+
+list2.bulletTracer.getAimPoint = function()
+	local camera = workspace.CurrentCamera
+	if not camera then return nil end
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { localPlayer.Character }
+	local hit = workspace:Raycast(ray.Origin, ray.Direction * 2000, params)
+	if hit then return hit.Position end
+	return ray.Origin + ray.Direction * 500
+end
+
+list2.bulletTracer.spawn = function(from, to)
+	if not from or not to then return end
+	local dist = (to - from).Magnitude
+	if dist < 0.5 then return end
+
+	local folder = list2.bulletTracer.getFolder()
+	if not folder then return end
+	local color = list2.bulletTracer.color
+	local tween = game:GetService("TweenService")
+
+	local part = Instance.new("Part")
+	part.Name = "FVLTracer"
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Material = Enum.Material.Neon
+	part.Color = color
+	part.Size = Vector3.new(0.13, 0.13, dist)
+	part.CFrame = CFrame.lookAt(from, to) * CFrame.new(0, 0, -dist / 2)
+	part.Transparency = 0.15
+	part.Parent = folder
+
+	tween:Create(part, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Transparency = 1 }):Play()
+	task.delay(0.55, function()
+		if part and part.Parent then part:Destroy() end
+	end)
+
+	local flash = Instance.new("Part")
+	flash.Name = "FVLFlash"
+	flash.Shape = Enum.PartType.Ball
+	flash.Anchored = true
+	flash.CanCollide = false
+	flash.CanQuery = false
+	flash.CanTouch = false
+	flash.CastShadow = false
+	flash.Material = Enum.Material.Neon
+	flash.Color = color
+	flash.Size = Vector3.new(0.8, 0.8, 0.8)
+	flash.CFrame = CFrame.new(from)
+	flash.Transparency = 0.2
+	flash.Parent = folder
+
+	tween:Create(flash, TweenInfo.new(0.15), {
+		Size = Vector3.new(0.1, 0.1, 0.1),
+		Transparency = 1,
+	}):Play()
+	task.delay(0.25, function()
+		if flash and flash.Parent then flash:Destroy() end
+	end)
+end
+
+list2.bulletTracer.start = function()
+	if list2.bulletTracer.conn then return end
+	task.spawn(function()
+		local ok, WeaponService = pcall(function()
+			return require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
+		end)
+		if not ok or type(WeaponService) ~= "table" or not WeaponService.GunFired then
+			return
+		end
+		list2.bulletTracer.conn = WeaponService.GunFired.OnClientEvent:Connect(function(gun)
+			if not list2.bulletTracer.on then return end
+			local character = localPlayer.Character
+			if not character or typeof(gun) ~= "Instance" then return end
+			if not gun:IsDescendantOf(character) then return end
+
+			local from = list2.bulletTracer.getMuzzle()
+			local to = list2.bulletTracer.getAimPoint()
+			if from and to then
+				list2.bulletTracer.spawn(from, to)
+			end
+		end)
+	end)
+end
+
+list2.bulletTracer.stop = function()
+	if list2.bulletTracer.conn then
+		pcall(function() list2.bulletTracer.conn:Disconnect() end)
+		list2.bulletTracer.conn = nil
+	end
+	if list2.bulletTracer.folder then
+		pcall(function() list2.bulletTracer.folder:Destroy() end)
+		list2.bulletTracer.folder = nil
+	end
+end
+
+tbl43.visuals:Toggle({
+	Title = "子弹轨迹",
+	Flag = "Toggle_Bullet_Tracer",
+	Desc = "开枪时显示从枪口到命中点的发光轨迹。",
+	Type = "Toggle",
+	Value = false,
+	Callback = function(value)
+		list2.bulletTracer.on = value
+		if value then
+			list2.bulletTracer.start()
+		else
+			list2.bulletTracer.stop()
+		end
+	end,
+})
+
+tbl43.visuals:Colorpicker({
+	Title = "轨迹颜色",
+	Flag = "Colorpicker_Bullet_Tracer",
+	Desc = "子弹轨迹和枪口闪光的颜色。",
+	Default = Color3.fromRGB(255, 220, 100),
+	Callback = function(color)
+		list2.bulletTracer.color = color
+	end,
+})
+
+-- ===== 枪械模型放大（纯客户端视觉） =====
+list2.gunScale = {
+    on = false,
+    scale = 2.5,
+    saved = {},
+    conn = nil,
+}
+
+list2.gunScale.apply = function(tool)
+    if not tool then return end
+    local scale = list2.gunScale.scale
+    local saved = list2.gunScale.saved
+
+    for _, d in ipairs(tool:GetDescendants()) do
+        if d:IsA("BasePart") then
+            if saved[d] == nil then
+                saved[d] = d.Size
+            end
+            d.Size = saved[d] * scale
+        elseif d:IsA("SpecialMesh") then
+            if saved[d] == nil then
+                saved[d] = d.Scale
+            end
+            d.Scale = saved[d] * scale
+        end
+    end
+end
+
+list2.gunScale.restoreAll = function()
+    local saved = list2.gunScale.saved
+    list2.gunScale.saved = {}
+
+    for inst, val in next, saved, nil do
+        pcall(function()
+            if inst and inst.Parent then
+                if inst:IsA("BasePart") then
+                    inst.Size = val
+                elseif inst:IsA("SpecialMesh") then
+                    inst.Scale = val
+                end
+            end
+        end)
+    end
+end
+
+list2.gunScale.start = function()
+    if list2.gunScale.conn then return end
+
+    list2.gunScale.conn = RunService.Heartbeat:Connect(function()
+        if not list2.gunScale.on then return end
+
+        local character = localPlayer.Character
+        if not character then return end
+
+        local gun = character:FindFirstChild("Gun")
+        if gun then
+            pcall(list2.gunScale.apply, gun)
+        end
+    end)
+end
+
+list2.gunScale.stop = function()
+    if list2.gunScale.conn then
+        pcall(function() list2.gunScale.conn:Disconnect() end)
+        list2.gunScale.conn = nil
+    end
+    list2.gunScale.restoreAll()
+end
+
+list2.knifeScale = {
+    on = false,
+    scale = 2.5,
+    saved = {},
+    conn = nil,
+}
+
+list2.knifeScale.apply = function(tool)
+    if not tool then return end
+    local scale = list2.knifeScale.scale
+    local saved = list2.knifeScale.saved
+
+    for _, d in ipairs(tool:GetDescendants()) do
+        if d:IsA("BasePart") then
+            if saved[d] == nil then
+                saved[d] = d.Size
+            end
+            d.Size = saved[d] * scale
+        elseif d:IsA("SpecialMesh") then
+            if saved[d] == nil then
+                saved[d] = d.Scale
+            end
+            d.Scale = saved[d] * scale
+        end
+    end
+end
+
+list2.knifeScale.restoreAll = function()
+    local saved = list2.knifeScale.saved
+    list2.knifeScale.saved = {}
+
+    for inst, val in next, saved, nil do
+        pcall(function()
+            if inst and inst.Parent then
+                if inst:IsA("BasePart") then
+                    inst.Size = val
+                elseif inst:IsA("SpecialMesh") then
+                    inst.Scale = val
+                end
+            end
+        end)
+    end
+end
+
+list2.knifeScale.start = function()
+    if list2.knifeScale.conn then return end
+
+    list2.knifeScale.conn = RunService.Heartbeat:Connect(function()
+        if not list2.knifeScale.on then return end
+
+        local character = localPlayer.Character
+        if not character then return end
+
+        local knife = character:FindFirstChild("Knife")
+        if knife then
+            pcall(list2.knifeScale.apply, knife)
+        end
+    end)
+end
+
+list2.knifeScale.stop = function()
+    if list2.knifeScale.conn then
+        pcall(function() list2.knifeScale.conn:Disconnect() end)
+        list2.knifeScale.conn = nil
+    end
+    list2.knifeScale.restoreAll()
+end
+
+tbl43.visuals:Section({ Title = "枪械模型" })
+
+list2.el.gunScale = tbl43.visuals:Toggle({
+    Title = "枪械模型变大",
+    Flag = "Toggle_Gun_Scale",
+    Desc = "你手上的枪会变大装备枪后立即生效。",
+    Type = "Toggle",
+    Value = false,
+    Callback = function(value)
+        list2.gunScale.on = value
+
+        if value then
+            list2.gunScale.start()
+            obj2:Notify({
+                Title = "枪械模型",
+                Content = "已开启，装备枪后生效。",
+                Duration = 2,
+                Icon = "check",
+            })
+        else
+            list2.gunScale.stop()
+            obj2:Notify({
+                Title = "枪械模型",
+                Content = "已关闭，尺寸已还原。",
+                Duration = 2,
+                Icon = "power-off",
+            })
+        end
+    end,
+})
+
+tbl43.visuals:Slider({
+    Title = "枪械大小倍率",
+    Flag = "Slider_Gun_Scale",
+    Desc = "100 = 原始大小，最大 2000 = 20 倍。",
+    Step = 10,
+    Value = { Min = 100, Max = 2000, Default = 250 },
+    Callback = function(value)
+        local numeric = tonumber(value) or (type(value) == "table" and tonumber(value.Value))
+        if numeric then
+            list2.gunScale.scale = numeric / 100
+        end
+    end,
+})
+
+tbl43.visuals:Section({ Title = "刀模型（凶手）" })
+
+list2.el.knifeScale = tbl43.visuals:Toggle({
+    Title = "刀模型变大",
+    Flag = "Toggle_Knife_Scale",
+    Desc = "轮到凶手身份装备刀时，刀会变大",
+    Type = "Toggle",
+    Value = false,
+    Callback = function(value)
+        list2.knifeScale.on = value
+
+        if value then
+            list2.knifeScale.start()
+            obj2:Notify({
+                Title = "刀模型",
+                Content = "已开启，轮到凶手装备刀后会自动放大。",
+                Duration = 2,
+                Icon = "check",
+            })
+        else
+            list2.knifeScale.stop()
+            obj2:Notify({
+                Title = "刀模型",
+                Content = "已关闭，尺寸已还原。",
+                Duration = 2,
+                Icon = "power-off",
+            })
+        end
+    end,
+})
+
+tbl43.visuals:Slider({
+    Title = "刀大小倍率",
+    Flag = "Slider_Knife_Scale",
+    Desc = "100 = 原始大小，最大 1000 = 10 倍。",
+    Step = 10,
+    Value = { Min = 100, Max = 1000, Default = 250 },
+    Callback = function(value)
+        local numeric = tonumber(value) or (type(value) == "table" and tonumber(value.Value))
+        if numeric then
+            list2.knifeScale.scale = numeric / 100
+
+            if list2.knifeScale.on then
+                local character = localPlayer.Character
+                local knife = character and character:FindFirstChild("Knife")
+                if knife then
+                    pcall(function()
+                        for d, val in next, list2.knifeScale.saved, nil do
+                            if d and d.Parent then
+                                if d:IsA("BasePart") then
+                                    d.Size = val
+                                elseif d:IsA("SpecialMesh") then
+                                    d.Scale = val
+                                end
+                            end
+                        end
+                    end)
+                    pcall(list2.knifeScale.apply, knife)
+                end
+            end
+        end
+    end,
+})
 list2.myRole = function()
 	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 	remotes = remotes and remotes:FindFirstChild("Extras")
@@ -9256,7 +9716,7 @@ do
 	list2.farmHopOn = true
 
 	tbl43.farm:Toggle({
-		Title = "服务器空时换服",
+		Title = "服务器没人换服",
 		Flag = "Toggle_Farm_Dead_Hop",
 		Desc = "农场过程中服务器人数过少时换到新服务器。",
 		Type = "Toggle",
@@ -9671,47 +10131,65 @@ do
 		end,
 	})
 
-	tbl43.buttons:Toggle({
-		Title = "穿墙按钮",
-		Flag = "Toggle_Noclip_Button",
-		Desc = "开关穿墙——可以穿墙行走。",
-		Type = "Toggle",
-		Value = false,
-		Callback = function(value)
-			if value then
-				num15.create("Noclip", "穿墙", tbl35.Noclip, HUDAccent.Noclip, HUDIcon.Noclip, function()
-					flag41 = not flag41
+tbl43.buttons:Toggle({
+	Title = "穿墙按钮",
+	Flag = "Toggle_Noclip_Button",
+	Desc = "开关穿墙——可以穿墙行走。",
+	Type = "Toggle",
+	Value = false,
+	Callback = function(value)
+		if value then
+			num15.create("Noclip", "穿墙", tbl35.Noclip, HUDAccent.Noclip, HUDIcon.Noclip, function()
+				flag41 = not flag41
 
-					if flag41 then
-						func39()
-					else
-						func40()
-					end
-
-					num15.setActive("Noclip", flag41)
-					list2.setToggle(list2.el.noclip, flag41)
-				end)
+				if flag41 then
+					func39()
+				else
+					func40()
+				end
 
 				num15.setActive("Noclip", flag41)
-			else
-				num15.destroy("Noclip")
+				list2.setToggle(list2.el.noclip, flag41)
+			end)
+
+			num15.setActive("Noclip", flag41)
+		else
+			num15.destroy("Noclip")
+		end
+	end,
+})
+
+tbl43.buttons:Toggle({
+	Title = "杀戮光环按钮（仅凶手）",
+	Flag = "Toggle_Kill_Aura_Button",
+	Desc = "杀戮光环的开关按钮",
+	Type = "Toggle",
+	Value = false,
+	Callback = function(value)
+		if value then
+			if list2.hudSpawns and list2.hudSpawns.KillAura then
+				list2.hudSpawns.KillAura()
 			end
-		end,
-	})
+		else
+			num15.destroy("KillAura")
+		end
+	end,
+})
 
 	list2.BTN_GLYPH = {
-		Toggle_Shoot_Murderer = "Shoot",
-		Toggle_Grab_Gun = "Grab",
-		Toggle_Throw_Knife = "Throw",
-		Toggle_Bomb_Jump = "Bomb",
-		Toggle_Wall_Hop = "WallHop",
-		Toggle_Aimbot_Button = "Aimbot",
-		Toggle_Kill_All_Button = "KillAll",
-		Toggle_Kill_Sheriff_Button = "KillSheriff",
-		Toggle_Xray_Button = "Xray",
-		Toggle_Fly_Button = "Fly",
-		Toggle_Noclip_Button = "Noclip",
-	}
+	Toggle_Shoot_Murderer = "Shoot",
+	Toggle_Grab_Gun = "Grab",
+	Toggle_Throw_Knife = "Throw",
+	Toggle_Bomb_Jump = "Bomb",
+	Toggle_Wall_Hop = "WallHop",
+	Toggle_Aimbot_Button = "Aimbot",
+	Toggle_Kill_All_Button = "KillAll",
+	Toggle_Kill_Sheriff_Button = "KillSheriff",
+	Toggle_Xray_Button = "Xray",
+	Toggle_Fly_Button = "Fly",
+	Toggle_Noclip_Button = "Noclip",
+	Toggle_Kill_Aura_Button = "KillAura",
+}
 
 	task.spawn(function()
 		for i = 1, 40 do
@@ -9770,6 +10248,18 @@ do
 		KillSheriff = function()
 			num15.create("KillSheriff", "击杀\n警长", tbl35.KillSheriff, HUDAccent.KillSheriff, HUDIcon.KillSheriff, list2.killSheriff)
 		end,
+		KillAura = function()
+    num15.create("KillAura", "杀戮\n光环", tbl35.KillAura, HUDAccent.KillAura, HUDIcon.KillAura, function()
+        -- 按钮点击 = 切换光环开关（会自动同步 UI）
+        local newState = not (list2.killAura and list2.killAura.on)
+        if list2.killAura and list2.killAura.el and list2.killAura.el.toggle then
+            list2.setToggle(list2.killAura.el.toggle, newState)
+        end
+    end)
+    if list2.killAura then
+        num15.setActive("KillAura", list2.killAura.on)
+    end
+end,
 		Xray = function()
 			num15.create("Xray", "免费\nX光", tbl35.Xray, HUDAccent.Xray, HUDIcon.Xray, function()
 				list2.setXray(not list2.xrayOn)
@@ -12324,7 +12814,7 @@ do
 	list2.knifeEls[#list2.knifeEls + 1] = tbl43.combat:Toggle({
 		Title = "显示碰撞盒",
 		Flag = "Toggle_Show_Hitbox",
-		Desc = "将攻击范围显示为一个球体。",
+		Desc = "将攻击范围显示为一个圆圈。",
 		Type = "Toggle",
 		Value = false,
 		Callback = function(show)
@@ -12386,6 +12876,232 @@ list2.knifeEls[#list2.knifeEls + 1] = tbl43.combat:Button({
 	Callback = function()
 		func77()
 	end,
+})
+--==================================================================
+-- 杀戮光环 (Kill Aura) —— 仅凶手
+--==================================================================
+list2.killAura = {
+    on        = false,        -- 总开关
+    radius    = 15,           -- 作用半径 (studs)
+    interval  = 0.1,          -- 两次扫描之间的最短间隔 (秒)
+    lastKill  = 0,            -- 上次触发时间戳
+    conn      = nil,          -- Heartbeat 连接
+    ball      = nil,          -- 范围显示球体
+    ballConn  = nil,          -- 球体跟随连接
+    el        = {},           -- UI 元素引用
+}
+
+-- 是否是凶手？复用已有的 func15()
+list2.killAura.isMurderer = function()
+    return func15() == localPlayer
+end
+
+-- 刀是否拿在手上？（在背包里不算）
+list2.killAura.hasKnife = function()
+    local character = localPlayer.Character
+    return character ~= nil and character:FindFirstChild("Knife") ~= nil
+end
+
+-- 收集半径内的所有有效目标
+list2.killAura.gatherTargets = function()
+    local character = localPlayer.Character
+    if not character then return {} end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return {} end
+
+    local radius = list2.killAura.radius
+    local targets = {}
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local theirHrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local theirHum = player.Character:FindFirstChildOfClass("Humanoid")
+            if theirHrp and theirHum and theirHum.Health > 0 then
+                if (theirHrp.Position - hrp.Position).Magnitude <= radius then
+                    targets[#targets + 1] = theirHrp
+                end
+            end
+        end
+    end
+
+    return targets
+end
+
+-- 执行一次击杀（复用刀的 KnifeStabbed / HandleTouched 远程事件）
+list2.killAura.execute = function()
+    local character = localPlayer.Character
+    if not character then return end
+
+    local knife = character:FindFirstChild("Knife")
+    if not knife then return end
+
+    local events = knife:FindFirstChild("Events")
+    if not events then return end
+
+    local knifeStabbed  = events:FindFirstChild("KnifeStabbed")
+    local handleTouched = events:FindFirstChild("HandleTouched")
+    if not (knifeStabbed and handleTouched) then return end
+
+    local targets = list2.killAura.gatherTargets()
+    if #targets == 0 then return end
+
+    -- 先触发一次挥刀动画（可选，让动作更自然）
+    pcall(function()
+        knifeStabbed:FireServer()
+    end)
+
+    -- 逐个命中目标
+    for _, theirHrp in ipairs(targets) do
+        pcall(function()
+            handleTouched:FireServer(theirHrp)
+        end)
+    end
+end
+
+-- 停止循环
+list2.killAura.stop = function()
+    if list2.killAura.conn then
+        pcall(function() list2.killAura.conn:Disconnect() end)
+        list2.killAura.conn = nil
+    end
+end
+
+-- 启动循环
+list2.killAura.start = function()
+    list2.killAura.stop()
+    list2.killAura.conn = RunService.Heartbeat:Connect(function()
+        if not list2.killAura.on then return end              -- 开关关了
+        if not list2.killAura.isMurderer() then return end    -- 不是凶手
+        if not list2.killAura.hasKnife() then return end      -- 没拿刀
+
+        local now = os.clock()
+        if now - list2.killAura.lastKill < list2.killAura.interval then
+            return
+        end
+        list2.killAura.lastKill = now
+
+        pcall(list2.killAura.execute)
+    end)
+end
+
+-- 隐藏范围
+list2.killAura.hideBall = function()
+	if list2.killAura.ballConn then
+		pcall(function() list2.killAura.ballConn:Disconnect() end)
+		list2.killAura.ballConn = nil
+	end
+	if list2.killAura.ring then
+		pcall(function() list2.killAura.ring:destroy() end)
+		list2.killAura.ring = nil
+	end
+	if list2.killAura.ball then
+		pcall(function() list2.killAura.ball:Destroy() end)
+		list2.killAura.ball = nil
+	end
+end
+
+-- 显示范围（圆圈）
+list2.killAura.showBall = function()
+	list2.killAura.hideBall()
+
+	list2.killAura.ring = buildRangeRing({
+		name         = "FVLKillAuraRing",
+		color        = Color3.fromRGB(255, 60, 60),
+		radius       = list2.killAura.radius,
+		transparency = 0.25,
+	})
+
+	list2.killAura.ballConn = RunService.RenderStepped:Connect(function()
+		local character = localPlayer.Character
+		if not character then return end
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+		list2.killAura.ring.update(hrp.Position, list2.killAura.radius)
+	end)
+end
+
+--========================= UI =========================
+tbl43.combat:Section({ Title = "杀戮光环（仅凶手）" })
+
+list2.killAura.el.toggle = tbl43.combat:Toggle({
+    Title = "杀戮光环",
+    Flag = "Toggle_Kill_Aura",
+    Desc = "装备刀后，范围内所有玩家直接死亡。仅限凶手。",
+    Type = "Toggle",
+    Value = false,
+    Callback = function(value)
+        -- 开启时的凶手校验
+        if value and func15() ~= localPlayer then
+            obj2:Notify({
+                Title = "你不是凶手！",
+                Content = "杀戮光环仅限凶手使用。",
+                Duration = 3,
+                Icon = "x",
+            })
+            -- 强制回滚开关
+            pcall(function()
+                list2.killAura.el.toggle:SetValue(false)
+            end)
+            return
+        end
+
+        list2.killAura.on = value
+
+        if value then
+    list2.killAura.start()
+    if list2.killAura.el.show then
+        list2.setToggle(list2.killAura.el.show, true)
+    end
+    obj2:Notify({
+        Title = "杀戮光环已开启！",
+        Content = "拿出刀后，半径内玩家将被秒杀。",
+        Duration = 2,
+        Icon = "flame",
+    })
+        else
+            list2.killAura.stop()
+            obj2:Notify({
+                Title = "杀戮光环已关闭",
+                Content = "光环已停止。",
+                Duration = 2,
+                Icon = "power-off",
+            })
+        end
+
+        num15.setActive("KillAura", value)
+    end,
+})
+
+tbl43.combat:Slider({
+    Title = "光环范围",
+    Flag = "Slider_Kill_Aura_Radius",
+    Desc = "杀戮光环的作用半径（studs）。改大时圆圈会立即同步。",
+    Step = 1,
+    Value = { Min = 5, Max = 60, Default = 15 },
+    Callback = function(value)
+        local numeric = tonumber(value) or (type(value) == "table" and tonumber(value.Value))
+        if numeric then
+            list2.killAura.radius = numeric
+            if list2.killAura.ball then
+                list2.killAura.ball.Size = Vector3.one * numeric * 2
+            end
+        end
+    end,
+})
+
+list2.killAura.el.show = tbl43.combat:Toggle({
+    Title = "显示光环范围",
+    Flag = "Toggle_Kill_Aura_Show",
+    Desc = "把杀戮光环的作用范围显示为一个红色圆圈，方便调整半径。",
+    Type = "Toggle",
+    Value = false,
+    Callback = function(value)
+        if value then
+            list2.killAura.showBall()
+        else
+            list2.killAura.hideBall()
+        end
+    end,
 })
 
 func118("全部击杀", Color3.fromHex("#7F1D1D"), 0.25)
@@ -13495,12 +14211,18 @@ list2.perf.el.quality = tbl43.visuals:Toggle({
 func120(ICON.mono)
 
 do
-	local tbl110 = { ToggleGUI = Enum.KeyCode.G }
+	local tbl110 = { ToggleGUI = Enum.KeyCode.G, KillAura = Enum.KeyCode.Unknown }
 
 	local tbl111 = {
-		ToggleGUI = function()
-			obj3:Toggle()
-		end,
+	ToggleGUI = function()
+		obj3:Toggle()
+	end,
+	KillAura = function()
+		if not list2.killAura or not list2.killAura.el.toggle then
+			return
+		end
+		list2.setToggle(list2.killAura.el.toggle, not list2.killAura.on)
+	end,
 		Shoot = function()
 			func67()
 		end,
@@ -13632,7 +14354,8 @@ do
 	func197(tbl43.keybinds, "切换自瞄", list2.UNBOUND, "Aimbot", "Unknown")
 	tbl43.keybinds:Section({ Title = "玩家" })
 	func197(tbl43.keybinds, "切换穿墙", list2.UNBOUND, "Noclip", "Unknown")
-	func197(tbl43.keybinds, "切换飞行", list2.UNBOUND, "Fly", "Unknown")
+    func197(tbl43.keybinds, "切换飞行", list2.UNBOUND, "Fly", "Unknown")
+    func197(tbl43.keybinds, "切换杀戮光环", list2.UNBOUND, "KillAura", "Unknown")
 	func197(tbl43.keybinds, "切换无限跳跃", list2.UNBOUND, "InfJump", "Unknown")
 	func197(tbl43.keybinds, "切换防投掷", list2.UNBOUND, "AntiFling", "Unknown")
 	func197(tbl43.keybinds, "切换移动速度", list2.UNBOUND .. " 在你的滑块速度和 16 之间切换。", "Speed", "Unknown")
@@ -14172,7 +14895,7 @@ tbl43.settings:Button({
 })
 
 tbl43.settings:Button({
-	Title = "最小服务器",
+	Title = "跳转人少的服务器",
 	Desc = "加入玩家人数最少的服务器",
 	Icon = "lucide:users",
 	Callback = function()
@@ -14517,6 +15240,12 @@ end
 
 	list2.stopFarmHopWatch()
 	list2.flingAllRunning = false
+	if list2.killAura then
+    list2.killAura.on = false
+    list2.killAura.stop()
+    list2.killAura.hideBall()
+    num15.destroy("KillAura")
+end
 	num16.enabled = false
 	num16.stop()
 	func110()
@@ -14590,10 +15319,16 @@ end
 		end)
 	end
 
-	tbl34 = {}
 	num15.destroyAll()
-	func113()
+func113()
 
+if list2.gunScale then
+    list2.gunScale.stop()
+end
+
+if list2.knifeScale then
+    list2.knifeScale.stop()
+end
 	pcall(function()
 		if list2.perf then
 			list2.perf.restoreAll()
@@ -14762,3 +15497,73 @@ list2.notifyNow({
 	Duration = 10,
 	Icon = "https://i.postimg.cc/bvtQNNsN/cgf.png",
 })
+
+-- ===== 更新日志弹窗 =====
+list2.CHANGELOG_VERSION = "V1.1"
+list2.CHANGELOG_FILE = "FVLV2/changelog.txt"
+
+list2.changelogSeen = function()
+	local ok, data = pcall(function()
+		if isfile and readfile and isfile(list2.CHANGELOG_FILE) then
+			return readfile(list2.CHANGELOG_FILE)
+		end
+		return nil
+	end)
+
+	if ok and type(data) == "string" then
+		return (data:gsub("%s+", "")) == list2.CHANGELOG_VERSION
+	end
+
+	return false
+end
+
+list2.markChangelogSeen = function()
+	pcall(function()
+		if not writefile then
+			return
+		end
+
+		if makefolder and isfolder and not isfolder("FVLV2") then
+			makefolder("FVLV2")
+		end
+
+		writefile(list2.CHANGELOG_FILE, list2.CHANGELOG_VERSION)
+	end)
+end
+
+list2.showChangelog = function()
+	if list2.changelogSeen() then
+		return
+	end
+
+	task.spawn(function()
+		task.wait(2)
+
+		list2.card({
+			title = "更新日志 " .. list2.CHANGELOG_VERSION,
+			subtitle = "Nexus 本次更新内容",
+			body = "[+] 杀戮光环\n[+] 枪械模型变大\n[+] 刀模型变大\n[+] 人物旋转\n[+] 子弹轨迹",
+			bodyHeight = 122,
+			timeout = 0,
+			actions = {
+				{
+					label = "确定",
+					flex = 1,
+					primary = true,
+				},
+				{
+					label = "不再提示",
+					flex = 1,
+					callback = function()
+						list2.markChangelogSeen()
+					end,
+				},
+			},
+		})
+	end)
+end
+
+print("[FVL] 更新日志: 准备调用")
+print("[FVL] changelogSeen =", list2.changelogSeen())
+print("[FVL] card 类型 =", type(list2.card))
+list2.showChangelog()

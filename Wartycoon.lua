@@ -104,12 +104,47 @@ function createUI()
         }
     })
 
+
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        -- 方法1：WindUI 自带的 Toggle
+        if Window.Toggle then
+            pcall(function() Window:Toggle() end)
+            return
+        end
+        -- 方法2：Close / Open
+        if Window.Close and Window.Open then
+            pcall(function()
+                if Window.Visible then
+                    Window:Close()
+                else
+                    Window:Open()
+                end
+            end)
+            return
+        end
+        -- 方法3：兜底，直接切换 ScreenGui.Enabled
+        for _, gui in pairs(game:GetService("CoreGui"):GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name:lower():find("windui") then
+                gui.Enabled = not gui.Enabled
+                return
+            end
+        end
+        for _, gui in pairs(game.Players.LocalPlayer.PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name:lower():find("windui") then
+                gui.Enabled = not gui.Enabled
+                return
+            end
+        end
+    end
+end)
 Window:EditOpenButton({
     Title = "Nexus", 
     Icon = "https://i.postimg.cc/bvtQNNsN/cgf.png",
     CornerRadius = UDim.new(0,16),
     StrokeThickness = 4,
-    Color = ColorSequence.new(Color3.fromHex("FF6B6B")),
+    Color = ColorSequence.new(Color3.fromHex("FF6B6B")),  
     Draggable = true,
 })
 

@@ -341,8 +341,8 @@ do
 		Title = "Nexus",
 		Icon = "https://i.postimg.cc/bvtQNNsN/cgf.png",
 		Author = "Murder Mystery 2",
-		Folder = "FVLV2",
-		Background = "https://i.postimg.cc/xjJCV22z/zhe-feng-bi-zhi-chu-yin-chu-yin-wei-lai.png",
+		Folder = "nex",
+		Background = "https://i.postimg.cc/yxyxbYxn/hdgsvshshsh.jpg",
 		Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)).X - 24, 320, 850), math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)).Y - 24, 240, 560)),
 	}
 
@@ -365,7 +365,7 @@ do
 	obj3 = createWindow(value1, tbl2)
 end
 
-obj3:Tag({ Title = "BY：y", Icon = "qq", Color = Color3.fromHex("#ffffff"), Radius = 6 })
+obj3:Tag({ Title = "Nexus", Icon = "qq", Color = Color3.fromHex("#ffffff"), Radius = 6 })
 
 do
     local getAsset = getcustomasset or getsynasset
@@ -374,7 +374,7 @@ do
     pcall(function()
         if makefolder and isfolder and not isfolder("FVLV2") then makefolder("FVLV2") end
         if not (isfile and isfile(path)) then
-            writefile(path, game:HttpGet("https://i.postimg.cc/jqmZv3m3/Image-1790944436370-969.jpg"))
+            writefile(path, game:HttpGet("https://i.postimg.cc/bvtQNNsN/cgf.png"))
         end
         asset = getAsset(path)
     end)
@@ -993,29 +993,49 @@ list2.setXray = function(xrayOn)
 	list2.xrayOn = xrayOn
 
 	if xrayOn then
-		for _, descendant in ipairs(Workspace:GetDescendants()) do
-			if descendant:IsA("BasePart") and descendant.Transparency < 0.5 then
-				local model = descendant:FindFirstAncestorWhichIsA("Model")
+		local descendants = Workspace:GetDescendants()
+		local total = #descendants
+		local i = 1
 
-				if not (model and Players:GetPlayerFromCharacter(model)) then
-					if list2.xrayWas[descendant] == nil then
-						list2.xrayWas[descendant] = descendant.Transparency
+		task.spawn(function()
+			while i <= total and list2.xrayOn do
+				local stop = math.min(i + 200, total)
+				for j = i, stop do
+					local descendant = descendants[j]
+					if descendant:IsA("BasePart") and descendant.Transparency < 0.5 then
+						local model = descendant:FindFirstAncestorWhichIsA("Model")
+						if not (model and Players:GetPlayerFromCharacter(model)) then
+							if list2.xrayWas[descendant] == nil then
+								list2.xrayWas[descendant] = descendant.Transparency
+							end
+							descendant.Transparency = 0.5
+						end
 					end
+				end
+				i = stop + 1
+				RunService.Heartbeat:Wait()
+			end
+		end)
+	else
+		local list = {}
+		for k, value16 in next, list2.xrayWas, nil do
+			list[#list + 1] = { part = k, trans = value16 }
+		end
+		list2.xrayWas = {}
 
-					descendant.Transparency = 0.5
+		task.spawn(function()
+			for idx = 1, #list do
+				local item = list[idx]
+				pcall(function()
+					if item.part.Parent then
+						item.part.Transparency = item.trans
+					end
+				end)
+				if idx % 200 == 0 then
+					RunService.Heartbeat:Wait()
 				end
 			end
-		end
-	else
-		for k, value16 in next, list2.xrayWas, nil do
-			pcall(function()
-				if k.Parent then
-					k.Transparency = value16
-				end
-			end)
-		end
-
-		list2.xrayWas = {}
+		end)
 	end
 end
 
@@ -1751,20 +1771,59 @@ do
 		return nil
 	end
 
-	local function func24(list4)
-		for _, descendant in ipairs(list4:GetDescendants()) do
-			if descendant:IsA("BasePart") and descendant.Name ~= "HumanoidRootPart" and descendant.Transparency >= 1 then
-				func23(descendant)
+	-- 新增缓存表（放在 func24 之前）
+list2.charParts = setmetatable({}, { __mode = "k" })
+list2.charPartConns = setmetatable({}, { __mode = "k" })
 
-				if list2.revealed[descendant] == nil then
-					list2.revealed[descendant] = descendant.Transparency
-				end
+local function func24(list4)
+    local cache = list2.charParts[list4]
+    if not cache then
+        cache = {}
+        list2.charParts[list4] = cache
+        for _, descendant in ipairs(list4:GetDescendants()) do
+            if descendant:IsA("BasePart") and descendant.Name ~= "HumanoidRootPart" then
+                cache[#cache + 1] = descendant
+            end
+        end
+        list2.charPartConns[list4] = list4.DescendantAdded:Connect(function(d)
+            if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then
+                cache[#cache + 1] = d
+            end
+        end)
+    end
 
-				descendant.Transparency = 0.9
-			end
-		end
-	end
+    for i = 1, #cache do
+        local descendant = cache[i]
+        if descendant.Parent and descendant.Transparency >= 1 then
+            func23(descendant)
+            if list2.revealed[descendant] == nil then
+                list2.revealed[descendant] = descendant.Transparency
+            end
+            descendant.Transparency = 0.9
+        end
+    end
+end
+-- ===== 角色缓存 =====
+local roleCache = { murderer = nil, sheriff = nil, at = 0 }
+local _origFunc15, _origFunc16 = func15, func16
 
+local function rolesRefresh()
+	local now = os.clock()
+	if now - roleCache.at < 0.3 then return end
+	roleCache.at = now
+	roleCache.murderer = _origFunc15()
+	roleCache.sheriff  = _origFunc16()
+end
+
+func15 = function()
+	rolesRefresh()
+	return roleCache.murderer
+end
+func16 = function()
+	rolesRefresh()
+	return roleCache.sheriff
+end
+-- ===== 角色缓存结束 =====
 	ROLEBOX = { conns = {} }
 
 	ROLEBOX.hide = function(obj)
@@ -1828,8 +1887,13 @@ do
 		return flag18 or flag19 or flag20
 	end
 
-	func18 = function()
-		obj4:RemoveGroup("players")
+	list2.espLast = 0
+func18 = function()
+    local now = os.clock()
+    if now - list2.espLast < 0.1 then return end
+    list2.espLast = now
+
+    obj4:RemoveGroup("players")
 		if not func17() then
 			return
 		end
@@ -5264,7 +5328,7 @@ local flag78
 flag78 = false
 list2.wallbang = false
 list2.velTrack = {}
-list2.aimLead = 0.16
+list2.aimLead = 0.25
 
 list2.startVelTracker = function()
 	if list2.velConn then
@@ -5284,7 +5348,7 @@ list2.startVelTracker = function()
 
 				if not num13 then
 					list2.velTrack[player] = { p = humanoidRootPart.Position, t = now, v = Vector3.zero }
-				elseif now - num13.t >= 0.03 then
+				elseif now - num13.t >= 0.08 then
 					num13.v = (humanoidRootPart.Position - num13.p) / (now - num13.t)
 					num13.p = humanoidRootPart.Position
 					num13.t = now
@@ -5326,7 +5390,10 @@ list2.aimAt = function(obj, part3)
 	local humanoid = obj.Character and obj.Character:FindFirstChildOfClass("Humanoid")
 	local n3
 
-	if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then
+	-- 优先用真实速度：移动方向预测在甩飞/击退时会失真
+	if humanoid
+		and humanoid.MoveDirection.Magnitude > 0.1
+		and part3.AssemblyLinearVelocity.Magnitude < humanoid.WalkSpeed * 1.5 then
 		n3 = humanoid.MoveDirection.Unit * humanoid.WalkSpeed
 	else
 		n3 = part3.AssemblyLinearVelocity or Vector3.zero
@@ -5343,12 +5410,16 @@ list2.aimAt = function(obj, part3)
 	if n3.Magnitude < 0.5 then
 		return part3.Position
 	end
+
 	local num14 = list2.leadTime()
-	local n4 = part3.Position + Vector3.new(n3.X, 0, n3.Z) * num14
+
+	-- 关键修复：保留 Y 分量，跳/落/楼梯都能命中
+	local n4 = part3.Position + n3 * num14
 	local n5 = n4 - part3.Position
 
-	if n5.Magnitude > 8 then
-		n4 = part3.Position + n5.Unit * 8
+	-- 提前量上限从 8 放宽到 14，远距离也能打中
+	if n5.Magnitude > 14 then
+		n4 = part3.Position + n5.Unit * 14
 	end
 
 	_G.__FVL_AIM = { aim = n4, targetPos = part3.Position, vel = n3, lead = num14, t = os.clock() }
@@ -7251,37 +7322,45 @@ do
 		})
 	end
 
-	num16.start = function()
-		if num16.conn then
-			return
-		end
+	num16.lastAim = 0
+num16.lastWall = 0
+num16.wallOk = false
 
-		num16.conn = RunService.RenderStepped:Connect(function()
-			if not num16.enabled then
-				return
-			end
+num16.start = function()
+    if num16.conn then return end
+    num16.conn = RunService.Heartbeat:Connect(function()
+        if not num16.enabled then return end
+        local now = os.clock()
+        if now - num16.lastAim < 0.05 then return end
+        num16.lastAim = now
 
-			if not list2.hasGun() then
-				num16.warnNoGun()
-				return
-			end
-			num16.noGunWarned = false
+        if not list2.hasGun() then
+            num16.warnNoGun()
+            return
+        end
+        num16.noGunWarned = false
 
-			pcall(function()
-				local flag122
-				flag122, flag122 = num16.getTarget()
-				if not flag122 then
-					return
-				end
-				local currentCamera = workspace.CurrentCamera
-				if not currentCamera then
-					return
-				end
-				currentCamera.CFrame = currentCamera.CFrame:Lerp(CFrame.new(currentCamera.CFrame.Position, num16.predictedPosition(flag122) or flag122.Position), math.clamp(num16.smooth, 0.01, 1))
-			end)
-		end)
-	end
+        pcall(function()
+            local target, part = num16.getTarget()
+            if not part then return end
 
+            if num16.wallCheck then
+                if now - num16.lastWall > 0.1 then
+                    num16.lastWall = now
+                    num16.wallOk = func65(target.Character,
+                        localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart"))
+                end
+                if not num16.wallOk then return end
+            end
+
+            local cam = workspace.CurrentCamera
+            if not cam then return end
+            cam.CFrame = cam.CFrame:Lerp(
+                CFrame.new(cam.CFrame.Position, num16.predictedPosition(part) or part.Position),
+                math.clamp(num16.smooth, 0.01, 1))
+        end)
+    end)
+end
 	num16.stop = function()
 		if num16.conn then
 			num16.conn:Disconnect()
@@ -7322,7 +7401,7 @@ do
 	end
 
 	flag81 = { aimOn = false, aimConn = nil, aimDisabled = {}, conns = {} }
-	flag82 = { enabled = false, conn = nil, delay = 0.18, fov = 60, last = 0 }
+	flag82 = { enabled = false, conn = nil, delay = 0.04, fov = 250, last = 0 }
 
 	local function func101(player7)
 		if not player7 or not player7.Character then
@@ -7423,36 +7502,65 @@ do
 				return
 			end
 			local character = localPlayer.Character
-			local gun = character and character:FindFirstChild("Gun")
-			gun = gun and gun:FindFirstChild("Shoot")
-			character = character and character:FindFirstChild("HumanoidRootPart")
-			if not gun or not character then
-				return
-			end
+if not character then return end
+
+local gun = character:FindFirstChild("Gun")
+if not gun then
+	local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+	local backpackGun = backpack and backpack:FindFirstChild("Gun")
+	if backpackGun then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			pcall(function() humanoid:EquipTool(backpackGun) end)
+			gun = character:FindFirstChild("Gun")
+		end
+	end
+end
+
+local hrp = character:FindFirstChild("HumanoidRootPart")
+if not gun or not hrp then return end
+gun = gun:FindFirstChild("Shoot")
+if not gun then return end
+character = hrp
 			local result13 = func15()
-			local flag125 = result13 and result13 ~= localPlayer and func101(result13)
-			local value126 = nil
+			print("[FVL-AIM] target =", result13 and result13.Name, "| isMurderer =", result13 == func15())
+local flag125 = result13 and result13 ~= localPlayer and func101(result13)
+local value126 = nil
 
-			if flag125 then
-				local humanoidRootPart = result13.Character:FindFirstChild("HumanoidRootPart")
-				local flag126 = humanoidRootPart and (character.Position - humanoidRootPart.Position).Magnitude <= 300
-				value126 = nil
+if flag125 then
+	-- 用躯干作为瞄准点，比 HumanoidRootPart 更接近碰撞盒中心
+	local aimPart = result13.Character:FindFirstChild("UpperTorso")
+		or result13.Character:FindFirstChild("Torso")
+		or result13.Character:FindFirstChild("HumanoidRootPart")
+	local flag126 = false
 
-				if flag126 then
-					if flag78 and not list2.wallbang and not func65(result13.Character, character) then
-						obj2:Notify({
-							Title = "检测到墙！",
-							Content = "凶手在墙后。",
-							Duration = 2,
-							Icon = "shield",
-						})
-
-						value126 = nil
-					else
-						value126 = list2.aimAt(result13, humanoidRootPart)
-					end
-				end
+	if aimPart then
+		local cam = workspace.CurrentCamera
+		if cam then
+			local screenPos, onScreen = cam:WorldToViewportPoint(aimPart.Position)
+			if onScreen then
+				local center = cam.ViewportSize / 2
+				local fov = (list2.silentAim and list2.silentAim.fov) or 150
+				flag126 = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude <= fov
 			end
+		end
+	end
+
+	if flag126 then
+		if flag78 and not list2.wallbang and not func65(result13.Character, character) then
+			obj2:Notify({
+				Title = "检测到墙！",
+				Content = "凶手在墙后。",
+				Duration = 2,
+				Icon = "shield",
+			})
+
+			value126 = nil
+		else
+			value126 = list2.aimAt(result13, aimPart)
+		end
+	end
+end
 
 			value126 = value126 or list2.mouseAimPoint()
 			if not value126 then
@@ -7460,14 +7568,39 @@ do
 			end
 			local gunRaycastAttachment = character:FindFirstChild("GunRaycastAttachment")
 
-			if list2.wallbang and flag125 then
-				gun:FireServer(CFrame.new(value126 + Vector3.new(0, 1.5, 0)), CFrame.new(value126))
-			else
-				gun:FireServer(gunRaycastAttachment and gunRaycastAttachment.WorldCFrame or CFrame.new(character.Position), CFrame.new(value126))
-			end
-		end)
-	end
+			local fireFrom = gunRaycastAttachment and gunRaycastAttachment.WorldCFrame or CFrame.new(character.Position)
 
+		if list2.wallbang and flag125 then
+			gun:FireServer(CFrame.new(value126 + Vector3.new(0, 1.5, 0)), CFrame.new(value126))
+		else
+			gun:FireServer(fireFrom, CFrame.new(value126))
+		end
+
+		-- 补枪：0.05 秒后若目标还活着，用实时位置再打一枪
+		if flag125 then
+			task.spawn(function()
+				task.wait(0.05)
+
+				if result13
+					and result13.Character
+					and result13.Character:FindFirstChildOfClass("Humanoid")
+					and result13.Character.Humanoid.Health > 0 then
+
+					local hrp2 = result13.Character:FindFirstChild("UpperTorso")
+						or result13.Character:FindFirstChild("Torso")
+						or result13.Character:FindFirstChild("HumanoidRootPart")
+
+					if hrp2 then
+						local from2 = character:FindFirstChild("GunRaycastAttachment")
+						from2 = from2 and from2.WorldCFrame or CFrame.new(character.Position)
+
+						gun:FireServer(from2, CFrame.new(hrp2.Position + Vector3.new(0, 0.5, 0)))
+					end
+				end
+			end)
+		end
+	end)
+end
 	func75 = function()
 		if flag81.aimConn then
 			pcall(function()
@@ -7505,15 +7638,27 @@ do
 			end
 
 			pcall(function()
-				if func16() ~= localPlayer then
-					return
-				end
-				local character = localPlayer.Character
-				local gun = character and character:FindFirstChild("Gun")
-				gun = gun and gun:FindFirstChild("Shoot")
-				if not gun then
-					return
-				end
+	if func16() ~= localPlayer then
+		return
+	end
+	local character = localPlayer.Character
+	if not character then return end
+
+	local gun = character:FindFirstChild("Gun")
+	if not gun then
+		local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+		local backpackGun = backpack and backpack:FindFirstChild("Gun")
+		if backpackGun then
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				pcall(function() humanoid:EquipTool(backpackGun) end)
+				gun = character:FindFirstChild("Gun")
+			end
+		end
+	end
+	if not gun then return end
+	gun = gun:FindFirstChild("Shoot")
+	if not gun then return end
 				local result14 = func15()
 				if not result14 or result14 == localPlayer or not func101(result14) then
 					return
@@ -8142,7 +8287,7 @@ ICON = {
 
 -- ===== 关于脚本标签页 =====
 local AUTHOR_QQ = "2071274105" -- 例如 "123456789"
-local WELCOME_TEXT = "欢迎你游玩nexus😊😊😊😊祝你游玩愉快如有bug请去QQ反馈——y（QQ：2071274105）"
+local WELCOME_TEXT = "欢迎你游玩nexus祝你游玩愉快如有bug请去QQ反馈"
 
 tbl43.about = obj3:Tab({
 	Title = "关于脚本",
@@ -8160,15 +8305,15 @@ tbl43.about:Paragraph({
 })
 
 tbl43.about:Button({
-	Title = "复制作者QQ号",
-	Desc = "点击复制作者QQ号",
+	Title = "复制官方QQ群号",
+	Desc = "点击复制官方QQ群号",
 	Icon = "lucide:copy",
 	Callback = function()
 		local copied = list2.copyText(AUTHOR_QQ)
 
 		if copied then
 			obj2:Notify({
-				Title = "已复制作者QQ号",
+				Title = "已复制",
 				Content = WELCOME_TEXT,
 				Duration = 5,
 				Icon = "check",
@@ -10013,9 +10158,9 @@ do
 	})
 
 	tbl43.buttons:Toggle({
-		Title = "自瞄按钮",
+		Title = "静默自瞄按钮",
 		Flag = "Toggle_Aimbot_Button",
-		Desc = "开关自瞄，并显示其状态。",
+		Desc = "开关静默自瞄，并显示其状态。",
 		Type = "Toggle",
 		Value = false,
 		Callback = function(value)
@@ -10229,7 +10374,7 @@ tbl43.buttons:Toggle({
 			num15.create("Throw", "投掷\n飞刀", tbl35.Throw, HUDAccent.Throw, HUDIcon.Throw, func68)
 		end,
 		Aimbot = function()
-			local Aimbot, value155 = num15.create("Aimbot", "自瞄\n关闭", tbl35.Aimbot, HUDAccent.Aimbot, HUDIcon.Aimbot, function()
+			local Aimbot, value155 = num15.create("Aimbot", "静默自瞄\n关闭", tbl35.Aimbot, HUDAccent.Aimbot, HUDIcon.Aimbot, function()
 				num16.set(not num16.enabled)
 			end)
 
@@ -12744,7 +12889,178 @@ end,
 
 	list2.gunEls = {}
 	list2.knifeEls = {}
+	-- ============ 枪械修改 开始 ============
+list2.gunMod = {
+    rapidFire = false,
+    fireInterval = 0.05,
+    infiniteAmmo = false,
+    ammoValue = 999,
+    rapidThread = nil,
+    ammoThread = nil,
+    el = {},   -- ⬅️ 加上这一行！！！
+}
+
+list2.gunMod.getGun = function()
+    local character = localPlayer.Character
+    if not character then return nil end
+    local gun = character:FindFirstChild("Gun")
+    if gun and gun:IsA("Tool") then return gun end
+    return nil
+end
+
+list2.gunMod.startRapid = function()
+    if list2.gunMod.rapidThread then return end
+    list2.gunMod.rapidThread = task.spawn(function()
+        while list2.gunMod.rapidFire do
+            local gun = list2.gunMod.getGun()
+            if gun then
+                pcall(function()
+                    for _, attrName in ipairs({
+                        "Cooldown", "LastFire", "LastShot",
+                        "NextFire", "FireTime", "ReloadTime",
+                        "LastShoot", "FireDelay",
+                    }) do
+                        if gun:GetAttribute(attrName) ~= nil then
+                            gun:SetAttribute(attrName, 0)
+                        end
+                    end
+                    for _, attrName in ipairs({
+                        "CanShoot", "ReadyToFire", "CanFire", "Reloading",
+                    }) do
+                        if gun:GetAttribute(attrName) ~= nil then
+                            gun:SetAttribute(attrName, true)
+                        end
+                    end
+                    for _, child in ipairs(gun:GetChildren()) do
+                        local lname = child.Name:lower()
+                        if lname:find("cooldown") or lname:find("fire")
+                            or lname:find("reload") or lname:find("debounce")
+                            or lname:find("delay") then
+                            if child:IsA("NumberValue") or child:IsA("IntValue") then
+                                child.Value = 0
+                            elseif child:IsA("BoolValue") then
+                                child.Value = true
+                            end
+                        end
+                    end
+                end)
+            end
+            task.wait(list2.gunMod.fireInterval)
+        end
+    end)
+end
+
+list2.gunMod.stopRapid = function()
+    list2.gunMod.rapidFire = false
+    if list2.gunMod.rapidThread then
+        pcall(task.cancel, list2.gunMod.rapidThread)
+        list2.gunMod.rapidThread = nil
+    end
+end
+
+list2.gunMod.startAmmo = function()
+    if list2.gunMod.ammoThread then return end
+    list2.gunMod.ammoThread = task.spawn(function()
+        while list2.gunMod.infiniteAmmo do
+            local gun = list2.gunMod.getGun()
+            if gun then
+                pcall(function()
+                    for _, child in ipairs(gun:GetChildren()) do
+                        local lname = child.Name:lower()
+                        if lname == "ammo" or lname == "ammocount"
+                            or lname == "bullets" or lname == "clip"
+                            or lname == "magazine" or lname == "clipammo" then
+                            if child:IsA("NumberValue") or child:IsA("IntValue") then
+                                child.Value = list2.gunMod.ammoValue
+                            end
+                        end
+                    end
+                    for _, attrName in ipairs({
+                        "Ammo", "AmmoCount", "Bullets",
+                        "Clip", "Magazine", "MaxAmmo",
+                        "CurrentAmmo", "ReserveAmmo",
+                    }) do
+                        if gun:GetAttribute(attrName) ~= nil then
+                            gun:SetAttribute(attrName, list2.gunMod.ammoValue)
+                        end
+                    end
+                end)
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+list2.gunMod.stopAmmo = function()
+    list2.gunMod.infiniteAmmo = false
+    if list2.gunMod.ammoThread then
+        pcall(task.cancel, list2.gunMod.ammoThread)
+        list2.gunMod.ammoThread = nil
+    end
+end
+
+
 	tbl43.combat:Section({ Title = "警长" })
+-- ===== 静默自瞄 FOV 圆圈 =====
+list2.silentAim = {
+	fov = 150,            -- 屏幕 FOV 半径（像素）—— 只有圆圈内的杀手会被自动瞄准
+	showRing = false,     -- 是否显示屏幕圆圈
+	ring = nil,           -- ScreenGui 句柄
+	ringConn = nil,       -- RenderStepped 连接
+	el = {},              -- UI 引用
+}
+
+-- 隐藏圆圈
+list2.silentAim.hideRing = function()
+	if list2.silentAim.ringConn then
+		pcall(function() list2.silentAim.ringConn:Disconnect() end)
+		list2.silentAim.ringConn = nil
+	end
+	if list2.silentAim.ring then
+		pcall(function() list2.silentAim.ring:Destroy() end)
+		list2.silentAim.ring = nil
+	end
+end
+
+-- 显示屏幕中央的 FOV 圆圈
+list2.silentAim.showRingFn = function()
+	list2.silentAim.hideRing()
+
+	local hui = gethui and gethui() or game:GetService("CoreGui")
+	local sg = Instance.new("ScreenGui")
+	sg.Name = "FVLSilentAimFOV"
+	sg.IgnoreGuiInset = true
+	sg.ResetOnSpawn = false
+	sg.DisplayOrder = 9999
+	sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	sg.Parent = hui
+
+	local circle = Instance.new("Frame")
+	circle.Name = "FOVCircle"
+	circle.AnchorPoint = Vector2.new(0.5, 0.5)
+	circle.BackgroundTransparency = 1
+	circle.BorderSizePixel = 0
+	circle.ZIndex = 2
+	circle.Parent = sg
+	Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+	local stroke = Instance.new("UIStroke", circle)
+	stroke.Color = Color3.fromRGB(45, 212, 191)
+	stroke.Thickness = 2
+	stroke.Transparency = 0.25
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+	list2.silentAim.ring = sg
+
+	list2.silentAim.ringConn = RunService.RenderStepped:Connect(function()
+		local cam = workspace.CurrentCamera
+		if not cam or not circle.Parent then return end
+		local vp = cam.ViewportSize
+		local fov = list2.silentAim.fov
+		circle.Position = UDim2.fromOffset(vp.X / 2, vp.Y / 2)
+		circle.Size = UDim2.fromOffset(fov * 2, fov * 2)
+	end)
+end
 
 	list2.el.silentaim = tbl43.combat:Toggle({
 		Title = "静默自瞄",
@@ -12764,6 +13080,37 @@ end,
 	})
 
 	list2.gunEls[#list2.gunEls + 1] = list2.el.silentaim
+-- 静默自瞄 FOV 滑块
+list2.silentAim.el.fov = tbl43.combat:Slider({
+	Title = "静默自瞄 FOV",
+	Flag = "Slider_Silent_Aim_FOV",
+	Desc = "屏幕圆圈半径（像素）。开枪时只有圆圈内的凶手会被子弹自动追踪。",
+	Step = 5,
+	Value = { Min = 30, Max = 500, Default = 150 },
+	Callback = function(value)
+		local numeric = tonumber(value) or (type(value) == "table" and tonumber(value.Value))
+		if numeric then
+			list2.silentAim.fov = numeric
+		end
+	end,
+})
+
+-- 显示 FOV 圆圈开关
+list2.silentAim.el.show = tbl43.combat:Toggle({
+	Title = "显示自瞄 FOV 圆圈",
+	Flag = "Toggle_Silent_Aim_Show_Range",
+	Desc = "在屏幕准星处显示一个青色圆圈，代表静默自瞄的作用范围。只有圆圈内的凶手才会被自动瞄准。",
+	Type = "Toggle",
+	Value = false,
+	Callback = function(value)
+		list2.silentAim.showRing = value
+		if value then
+			list2.silentAim.showRingFn()
+		else
+			list2.silentAim.hideRing()
+		end
+	end,
+})
 
 	list2.gunEls[#list2.gunEls + 1] = tbl43.combat:Toggle({
 		Title = "自动开枪",
@@ -14351,7 +14698,7 @@ do
 	func197(tbl43.keybinds, "拾取枪", list2.UNBOUND, "Grab", "Unknown")
 	func197(tbl43.keybinds, "投掷飞刀", list2.UNBOUND, "Throw", "Unknown")
 	func197(tbl43.keybinds, "炸弹跳", list2.UNBOUND, "Bomb", "Unknown")
-	func197(tbl43.keybinds, "切换自瞄", list2.UNBOUND, "Aimbot", "Unknown")
+	func197(tbl43.keybinds, "切换静默自瞄", list2.UNBOUND, "Aimbot", "Unknown")
 	tbl43.keybinds:Section({ Title = "玩家" })
 	func197(tbl43.keybinds, "切换穿墙", list2.UNBOUND, "Noclip", "Unknown")
     func197(tbl43.keybinds, "切换飞行", list2.UNBOUND, "Fly", "Unknown")
@@ -15238,7 +15585,7 @@ end
 		list2.boxOn[boxe[1]] = false
 	end
 
-	list2.stopFarmHopWatch()
+		list2.stopFarmHopWatch()
 	list2.flingAllRunning = false
 	if list2.killAura then
     list2.killAura.on = false
@@ -15246,6 +15593,9 @@ end
     list2.killAura.hideBall()
     num15.destroy("KillAura")
 end
+	if list2.silentAim then
+		list2.silentAim.hideRing()
+	end
 	num16.enabled = false
 	num16.stop()
 	func110()
@@ -15328,6 +15678,10 @@ end
 
 if list2.knifeScale then
     list2.knifeScale.stop()
+end
+if list2.gunMod then
+    list2.gunMod.stopRapid()
+    list2.gunMod.stopAmmo()
 end
 	pcall(function()
 		if list2.perf then
